@@ -1,0 +1,10 @@
+bash -v build.sh
+bash -v run.sh
+
+user pwd
+
+https://localhost:9990/  (application)
+
+bash -v doc.sh
+
+http://localhost:9090/   (docs)

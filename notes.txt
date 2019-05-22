@@ -1,2 +1,5 @@
 cargo init rustywiki
 
+rustup override set nightly
+
+https://github.com/Detegr/rust-ctrlc

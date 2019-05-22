@@ -1,0 +1,28 @@
+{
+	"Page": "_user",
+	"Revision": "000000003",
+	"PreviousRevision": "000000002",
+	"CreateDate": "2018/05/12 19:53:05.248-07:00",
+	"RevisionDate": "2018/06/05 20:17:35.002-07:00",
+	"RevisedBy": "user",
+	"Comment": "Admin UserModify",
+	"Lock": "",
+	"Data": ""
+}
+<!--REVISION HEADER DEMARCATION>
+{
+	"Userlist": [
+		{
+			"User": "user",
+			"Password": "ANrt65Bg874GoXhZCpasmZfBi+yUY8iRqjiDZdnCSq3UUN1Zw0I8N6GwLLikct9L/DQNKoN2ZpzhqHC6XVoxWg==",
+			"Salt": "QJQcnj8qagIbZQof1e4KInfPCEnrp0VUbQE42PWufJsAfPSU6EXi8INgpWS+B4WrPRIO/8/MGoK67K6mI0RRBQ==",
+			"Comment": ""
+		},
+		{
+			"User": "root",
+			"Password": "pwd",
+			"Salt": "",
+			"Comment": ""
+		}
+	]
+}

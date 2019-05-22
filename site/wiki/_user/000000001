@@ -1,0 +1,26 @@
+{
+	"Page": "_user",
+	"Revision": "000000001",
+	"PreviousRevision": "000000000",
+	"CreateDate": "2018/05/12 19:53:05.248-07:00",
+	"RevisionDate": "2018/05/12 19:53:05.248-07:00",
+	"RevisedBy": "user",
+	"Comment": "Initial save"
+}
+<!--REVISION HEADER DEMARCATION>
+{
+	"Userlist": [
+		{
+			"User": "user",
+			"Password": "pwd",
+			"Salt": "",
+			"Comment": ""
+		},
+		{
+			"User": "root",
+			"Password": "pwd",
+			"Salt": "",
+			"Comment": ""
+		}
+	]
+}

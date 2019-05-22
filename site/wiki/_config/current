@@ -1,0 +1,22 @@
+{
+	"Page": "_config",
+	"Revision": "000000001",
+	"PreviousRevision": "000000000",
+	"CreateDate": "2018/05/12 19:53:05.248-07:00",
+	"RevisionDate": "2018/05/12 19:53:05.248-07:00",
+	"RevisedBy": "user",
+	"Comment": "Initial save"
+}
+<!--REVISION HEADER DEMARCATION>
+{
+	"StartPage": "start",
+	"CaseSensitive": false,
+	"AuthenticationRequiredForRead": true,
+	"AuthenticationRequiredForLogging": true,
+	"AllowMediaOverwrite" : false,
+	"NumberOfConcurrentLocks": 1000,
+	"MaxVelocity": 100000000,
+	"UnauthMaxVelocity": 1000000000,
+	"AdminUsers": ["root", "user"],
+	"AdminPages": ["/wiki/_config", "/wiki/_user", "/jsAdmin/UserDelete", "/jsAdmin/MasterReset"]
+}

@@ -1,0 +1,32 @@
+.localLink {
+	color: red;
+	text-decoration: underline;
+} 
+.localLink:hover {
+	color: blue;
+	text-decoration: underline;
+}
+
+.sectionHeaderDiv {
+    border-style: dotted;
+    border-width: 2px;
+    border-color: grey;
+    width:50%;
+}
+.sectionLink {
+	color:black;
+	font-size: 120%;
+	text-decoration: underline;
+}
+.sectionLink:hover {
+	color: blue;
+	text-decoration: underline;
+}
+
+.imageThumbnail:hover {
+	opacity:0.5;
+}
+.videoThumbnail:hover {
+	opacity:0.5;
+}
+
