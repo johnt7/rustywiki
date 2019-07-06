@@ -34,11 +34,13 @@ struct Task {
 */
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 struct LogData {
     LogText: String,
 }
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 struct UserModify {
  User: String,
  Password: String,
@@ -48,6 +50,7 @@ struct UserModify {
 }
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 struct Wikisave {
  Page : String,
  Revision : u16,
@@ -61,12 +64,14 @@ struct Wikisave {
 }
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 struct Wikilock {
  Page : String,
  Lock : String
 }
 
 #[derive(FromForm)]
+#[allow(non_snake_case)]
 struct Upload {
     uploadfile : String,
     token : String,
@@ -74,6 +79,7 @@ struct Upload {
 }
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 struct UserDelete {
  User : String
 }
@@ -100,12 +106,7 @@ fn get_command_line() -> ConfigInfo {
         port : matches.value_of("port").unwrap_or("9990").parse().unwrap_or(9990)
     }
 }
-/*
-#[get("/hello/<name>/<age>")]
-fn hello(name: String, age: u8) -> String {
-    format!("Hello, {} year old named {}!", age, name)
-}
-*/
+
 #[post("/jsLog/DebugNoTrunc", data = "<input>", rank=1)]
 fn rocket_route_js_debug_no_trunc(input: Json<LogData>) -> String {
     warn!("RustyWiki Dbg: {}", input.LogText);
@@ -146,7 +147,8 @@ fn rocket_route_user_lock(input: Json<Wikilock>) -> String {
 fn rocket_route_user_unlock(input: Json<Wikilock>) -> String {
     debug!("user unlock {} {}", input.Lock, input.Page);
     String::from("Ok")
-}#[post("/jsAdmin/UserDelete", data = "<input>")]
+}
+#[post("/jsAdmin/UserDelete", data = "<input>")]
 fn rocket_route_user_delete(input: Json<UserDelete>) -> String {
     debug!("user delete {}", input.User);
     String::from("Ok")
@@ -166,18 +168,7 @@ fn rocket_route_page(page_name : String) -> String {
     debug!("get page {}", page_name);
     String::from("Ok")
 }
-/*
-#[post("/jsLog/Debug", data = "<input>", rank=2)]
-fn jsDebugs(input: String) -> String {
-    format!("logged data s={}.", input)
-}
-*/
-/*
-#[get("/site/<ftype>/<filename>")]
-fn stsite(ftype: String, filename: String) -> String {
-    StaticFiles::from("site")
-}
-*/
+
 fn main() {
     let _config = get_command_line();
     let _ = SimpleLogger::init(LevelFilter::Warn, Config::default());    
