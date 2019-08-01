@@ -3,3 +3,9 @@ cargo init rustywiki
 rustup override set nightly
 
 https://github.com/Detegr/rust-ctrlc
+
+
+http://localhost:8000
+
+file:///C:/Users/John/OneDrive/projects/rust/rustywiki/target/doc/simplelog/enum.LevelFilter.html
+https://rocket.rs/v0.4/guide/getting-started/

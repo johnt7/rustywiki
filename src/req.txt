@@ -1,0 +1,147 @@
+// Copyright 2018 Sal Sanci
+
+/*
+A simple file based wiki written in go. The server is meant to have as few system requirements and code dependancies as possible.
+It provides a rest interface which provides for the reading / updating wiki pages, uploading media, and providing a media index.
+
+Transformation, renedering, and editing is done by a javascript app which runs in the browser, and uses the rest interfaces to
+communicate with the server. 
+
+This wiki has a simple access model with normal users and admin users.
+
+Configuration is done via a wiki page _config, the content is a single JSON oject which describe the configuration. It is loaded
+when the server starts up, and when a masterReset is issued via the rest interface. The default configuration can be found in
+site/wiki/_config/current.
+
+Page names may not contain . / \
+
+Depending on configuration, page names may be case insensitive. If so, they are mapped to lower case names in the file system.
+
+User management is done via a wikipage _user, the content is a JSON oject which contains an array of JSON user objects.
+
+All the web site / wiki content is in a single directory with the following structure:
+
+/
+
+/css - contains the css for the wiki
+
+/js - contains all the javascript required by the single page application
+
+/media - media files, may be organized into subdirectories
+
+/wiki - contains all wiki pages
+
+/index.html - the start page for the single page application
+
+
+The rest interfaces are as follows:
+
+/jsLog/DebugNoTrunc - POST { "LogText": "DATA TO LOG" };
+ 
+/jsLog/Debug - POST { "LogText": "DATA TO LOG" };
+
+/jsLog/ - POST { "LogText": "DATA TO LOG" };
+ 
+/jsLog/Exception - POST { "LogText": "DATA TO LOG"};
+
+/jsUser/UserModify - POST
+
+{
+ "User": "username",
+ "Password": "userpwd",
+ "NewPassword": "newuserpwd",
+ "NewPasswordCheck": "newuserpwd",
+ "Comment": "Comment for user"
+};
+
+
+/jsUser/Wikisave - POST
+{
+ "Page": "pageName",
+ "Revision":"000000002",
+ "PreviousRevision":"000000001",
+ "CreateDate": "2018/05/12 19:53:05.248-07:00",
+ "RevisionDate": "2018/05/12 19:53:05.248-07:00",
+ "RevisedBy": "user",
+ "Comment": "Initial save",
+ "Lock":"AStringUniquePerClient",
+ "Data": "wikipagedata"
+};
+
+/jsUser/Wikilock - POST
+{
+ "Page":: "pageName",
+ "Lock":"AStringUniquePerClient"
+};
+
+/jsUser/Wikiunlock - POST
+{
+ "Page":: "pageName",
+ "Lock":"AStringUniquePerClient"
+};
+
+/jsUser/Upload
+<form enctype="multipart/form-data" action="/jsUser/Upload" method="post">
+    <input type="file" name="uploadfile" />
+    <input type="hidden" name="token" value="{{.}}"/>
+    <input type="input" name="imageName" value=""/>
+    <input type="submit" value="upload" />
+</form>
+
+/jsAdmin/UserDelete - POST
+{
+ "User": "username"
+};
+
+
+/jsAdmin/MasterReset - GET
+
+/page/MediaIndex - GET
+
+/page/xxxxx - GET (where xxxxx is pageName)
+
+
+*/
+
+var configuration configurationStruct
+type configurationStruct struct {
+	CaseSensitive bool // This should be set if the file system and thus wiki page names are case sensitive. If in doubt set to false.
+	AuthenticationRequiredForRead bool // If true unautheticated users can read wiki pages
+	AuthenticationRequiredForLogging bool // Allows unauthenticated users to log debug. This is a potential denial of service vector.
+	AllowMediaOverwrite bool // Set to true to allow the overwriting media files on uploads.
+	StartPage string // the page loaded by default as the starting wiki page.
+	NumberOfConcurrentLocks int // The number of pages which can be concurrently locked for editing.
+	MaxNumberOfUsers int // The maximum number of users
+	MaxVelocity int // Minimum time in nanoseconds between authenticated requests from an IP address
+	UnauthMaxVelocity int // Minimum time in nanoseconds between unauthenticated requests from an IP address
+	AdminUsers []string // An array of admin user names
+	AdminPages []string // An array of pages and rest calls only available to admim users
+}
+
+
+var auth authStruct
+type authStruct struct {
+	Users authlistStruct
+	UserMap map[ string]userStruct;
+	Header  pageRevisionStruct
+}
+type authlistStruct struct { -- used for output only
+	Userlist []userStruct
+}
+type userStruct struct {
+	User string // The user name
+	Password string // The user password 
+	Salt string // A salt used to hash the user password
+	Comment string // a comment for this user
+}
+type pageRevisionStruct struct {
+	Page string
+	Revision string
+	PreviousRevision string
+	CreateDate string
+	RevisionDate string
+	RevisedBy string
+	Comment string
+	Lock string
+	Data string
+}

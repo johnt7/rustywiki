@@ -9,8 +9,14 @@ extern crate rocket_contrib;
 
 use rocket_contrib::serve::StaticFiles;
 use rocket_contrib::json::Json;
+use rocket::State;
+
 use simplelog::{SimpleLogger, LevelFilter, Config};
 //use rocket::request::Form;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
+use std::ops::Deref;
 
 const DATE_FORMAT : &str = "%Y/%m/%d %H:%M:%S%.3f";
 
@@ -63,7 +69,8 @@ struct Wikisave {
  Data : String
 }
 
-#[derive(Deserialize)]
+// also acts as unlock
+#[derive(Clone, Deserialize, Debug)]
 #[allow(non_snake_case)]
 struct Wikilock {
  Page : String,
@@ -84,6 +91,56 @@ struct UserDelete {
  User : String
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+struct AuthlistStruct {
+    Userlist : Vec<UserStruct>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+struct PageRevisionStruct {
+	Page : String,
+	Revision : String,
+	PreviousRevision : String,
+	CreateDate : String,
+	RevisionDate : String,
+	RevisedBy : String,
+	Comment : String,
+	Lock : String,
+	Data : String
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+struct UserStruct {
+	User : String, 
+	Password : String, 
+	Salt : String, 
+	Comment : String 
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+struct AuthStruct {
+    UserMap : HashMap<String, UserStruct>,
+    Header : PageRevisionStruct
+}
+
+struct RequestDelayStruct {
+    delay : Duration,
+    last : Instant
+}
+
+
+struct PageMap ( Arc<Mutex<HashMap<String, String>>> );
+impl Deref for PageMap {
+    type Target = Mutex<HashMap<String, String>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 /// Loads information from the command line
 fn get_command_line() -> ConfigInfo {
     let matches = clap_app!(rtinywiki =>
@@ -139,15 +196,52 @@ fn rocket_route_wiki_save(input: Json<Wikisave>) -> String {
     String::from("Ok")
 }
 #[post("/jsUser/Wikilock", data = "<input>")]
-fn rocket_route_user_lock(input: Json<Wikilock>) -> String {
-    debug!("user lock {} {}", input.Lock, input.Page);
-    String::from("Ok")
+fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
+    info!("user lock {:?}", &input);
+    let res;
+    if input.Page == "" || input.Lock == "" {
+        info!("bad page");
+        return None;
+    }
+    if let Some(_) = lock_data.lock().unwrap().get(&input.Page) {
+        info!("already locked page");
+        return None;
+    }
+    info!("good page");
+    res = lock_data.lock().unwrap().insert(input.Page.clone(), input.Lock.clone());
+    info!("done page");
+    let ct = lock_data.lock().unwrap().len();
+    info!("user lock len = {} res={:?}", ct, res);
+    Some(String::from("Ok"))
 }
+
 #[post("/jsUser/Wikiunlock", data = "<input>")]
-fn rocket_route_user_unlock(input: Json<Wikilock>) -> String {
-    debug!("user unlock {} {}", input.Lock, input.Page);
-    String::from("Ok")
+fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
+    info!("user unlock {:?}", &input);
+    let res;
+    if input.Page == "" {
+        info!("bad unlock");
+        return None;
+    }
+    if let Some(ll) = lock_data.lock().unwrap().get(&input.Page) {
+        info!("have unlock");
+        if ll == &input.Lock {
+         info!("match unlock");
+        } else {
+        info!("nomatch unlock");
+            return None;
+        }
+    } else {
+        info!("none unlock");
+        return None;
+    }
+    res = lock_data.lock().unwrap().remove(&input.Page);
+    info!("none unlock");
+    let ct = lock_data.lock().unwrap().len();
+    info!("user lock {} {} = len={} res={:?}", input.Lock, input.Page, ct, res);
+    Some(String::from("Ok"))
 }
+
 #[post("/jsAdmin/UserDelete", data = "<input>")]
 fn rocket_route_user_delete(input: Json<UserDelete>) -> String {
     debug!("user delete {}", input.User);
@@ -169,10 +263,80 @@ fn rocket_route_page(page_name : String) -> String {
     String::from("Ok")
 }
 
+fn testserde() {
+    println!("testserde");
+    let u1 = UserStruct {
+        User : "u1".to_string(),
+        Password : "u1p".to_string(), 
+        Salt : "u1s".to_string(), 
+        Comment : "u1c".to_string() 
+    };
+    let u2 = UserStruct {
+        User : "u2".to_string(),
+        Password : "u2p".to_string(), 
+        Salt : "u2s".to_string(), 
+        Comment : "u2c".to_string() 
+    };
+    println!("u1={:?}", u1);
+    let mut al = AuthlistStruct { Userlist: Vec::new() };
+    let serialized = serde_json::to_string(&u1).unwrap();
+    println!("serialized = {}", serialized);
+    al.Userlist.push(u1);
+    al.Userlist.push(u2);
+    let s2 = serde_json::to_string(&al).unwrap();
+    let al2 : AuthlistStruct = serde_json::from_str(&s2).unwrap();
+    println!("s2 = {}", s2);
+    println!("al2 = {:?}", al2);
+}
+fn load_auth() -> Option<AuthStruct> {
+    Some(AuthStruct{     
+        UserMap : HashMap::new(),
+        Header : PageRevisionStruct {
+            Page : String::new(),
+            Revision : String::new(),
+            PreviousRevision : String::new(),
+            CreateDate : String::new(),
+            RevisionDate : String::new(),
+            RevisedBy : String::new(),
+            Comment : String::new(),
+            Lock : String::new(),
+            Data : String::new()
+        }
+    })
+}
+fn gen_auth() -> AuthStruct {
+    AuthStruct{     
+        UserMap : HashMap::new(),
+        Header : PageRevisionStruct {
+            Page : String::new(),
+            Revision : String::new(),
+            PreviousRevision : String::new(),
+            CreateDate : String::new(),
+            RevisionDate : String::new(),
+            RevisedBy : String::new(),
+            Comment : String::new(),
+            Lock : String::new(),
+            Data : String::new()
+        }
+    }
+}
 fn main() {
     let _config = get_command_line();
-    let _ = SimpleLogger::init(LevelFilter::Warn, Config::default());    
+    println!("got config={:?}", _config);
+    testserde();
+    let auth = match load_auth() {
+        Some(a) => a,
+        None => gen_auth()
+    };
+    let delay_map : HashMap<String, RequestDelayStruct> =  HashMap::new();
+    let lock_map = PageMap ( Arc::new(Mutex::new(HashMap::new())) );
+    let d1 = Wikilock { Page: "foo".to_string(), Lock: "something".to_string() };
+    lock_map.lock().unwrap().insert(d1.Page, d1.Lock);
+    let _ = SimpleLogger::init(LevelFilter::Info, Config::default());    
     rocket::ignite()
+    .manage(auth)
+    .manage(delay_map)
+    .manage(lock_map)
     .mount("/", StaticFiles::from("site"))
     .mount("/", routes![rocket_route_js_debug_no_trunc, 
         rocket_route_js_debug, rocket_route_js_exception, rocket_route_js_log,
