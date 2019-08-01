@@ -197,47 +197,35 @@ fn rocket_route_wiki_save(input: Json<Wikisave>) -> String {
 }
 #[post("/jsUser/Wikilock", data = "<input>")]
 fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
-    info!("user lock {:?}", &input);
-    let res;
     if input.Page == "" || input.Lock == "" {
-        info!("bad page");
         return None;
     }
-    if let Some(_) = lock_data.lock().unwrap().get(&input.Page) {
-        info!("already locked page");
+    let mut mp = lock_data.lock().unwrap();
+    if let Some(_) = mp.get(&input.Page) {
         return None;
     }
-    info!("good page");
-    res = lock_data.lock().unwrap().insert(input.Page.clone(), input.Lock.clone());
-    info!("done page");
-    let ct = lock_data.lock().unwrap().len();
+    let res = mp.insert(input.Page.clone(), input.Lock.clone());
+    let ct = mp.len();
     info!("user lock len = {} res={:?}", ct, res);
     Some(String::from("Ok"))
 }
 
 #[post("/jsUser/Wikiunlock", data = "<input>")]
 fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
-    info!("user unlock {:?}", &input);
-    let res;
-    if input.Page == "" {
-        info!("bad unlock");
+     if input.Page == "" {
         return None;
     }
-    if let Some(ll) = lock_data.lock().unwrap().get(&input.Page) {
-        info!("have unlock");
-        if ll == &input.Lock {
-         info!("match unlock");
-        } else {
-        info!("nomatch unlock");
+    let mut mp = lock_data.lock().unwrap();
+    if let Some(ll) = mp.get(&input.Page) {
+        if ll != &input.Lock {
             return None;
         }
     } else {
-        info!("none unlock");
         return None;
     }
-    res = lock_data.lock().unwrap().remove(&input.Page);
-    info!("none unlock");
-    let ct = lock_data.lock().unwrap().len();
+    let res = mp.remove(&input.Page);
+
+    let ct = mp.len();
     info!("user lock {} {} = len={} res={:?}", input.Lock, input.Page, ct, res);
     Some(String::from("Ok"))
 }
