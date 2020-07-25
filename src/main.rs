@@ -7,6 +7,8 @@ extern crate simplelog;
 extern crate rocket_contrib;
 #[macro_use] extern crate serde_derive;
 
+#[cfg(test)] mod tests;
+
 use rocket_contrib::serve::StaticFiles;
 use rocket_contrib::json::Json;
 use rocket::{State, Request};
