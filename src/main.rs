@@ -500,28 +500,5 @@ fn create_rocket() -> rocket::Rocket {
 fn main() {
     let _config = get_command_line();
     println!("got config={:?}", _config);
-    /*
-    testserde();
-    let auth = match load_auth() {
-        Some(a) => a,
-        None => gen_auth()
-    };
-    let delay_map = DelayMap ( Arc::new(Mutex::new(HashMap::new())) );
-    let lock_map = PageMap ( Arc::new(Mutex::new(HashMap::new())) );
-    let d1 = Wikilock { Page: "foo".to_string(), Lock: "something".to_string() };
-    lock_map.lock().unwrap().insert(d1.Page, d1.Lock);
-    let _ = SimpleLogger::init(LevelFilter::Info, Config::default());    
-    rocket::ignite()
-    .manage(auth)
-    .manage(delay_map)
-    .manage(lock_map)
-    .mount("/", StaticFiles::from("site"))  // use the site value from config
-    .mount("/", routes![rocket_route_js_debug_no_trunc, 
-        rocket_route_js_debug, rocket_route_js_exception, rocket_route_js_error, rocket_route_js_log,
-        rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
-        rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
-        rocket_route_media_index, rocket_route_page])
-        */
-    let rkt = create_rocket();
-    rkt.launch();
+    create_rocket().launch();
 }
