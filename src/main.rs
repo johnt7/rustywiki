@@ -3,32 +3,44 @@
 #[macro_use] extern crate clap;
 #[macro_use] extern crate rocket;
 #[macro_use] extern crate log;
-extern crate simplelog;
-extern crate rocket_contrib;
 #[macro_use] extern crate serde_derive;
 
+use std::{
+    collections::HashMap,
+    fmt,
+    fs::{self, File},
+    io::{self, Cursor},
+    ops::Deref,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
+
+use rocket::{
+    Data,
+    http::{ContentType, Cookie, Cookies, RawStr, Status, Header},
+    outcome::IntoOutcome,
+    request::{self, Form, FlashMessage, FromRequest, Request},
+    Response,
+    response::status,
+    State
+};
+
+use rocket_contrib::{
+    serve::StaticFiles,
+    json::Json
+};
+
+
+// Modules
 #[cfg(test)] mod tests;
 
-use rocket_contrib::serve::StaticFiles;
-use rocket_contrib::json::Json;
-use rocket::{State, Request};
-use rocket::response::{Responder, Response};
-use rocket::http::RawStr;
-use rocket::http::ContentType;
-use rocket::http::Status;
-use rocket::Data;
 
-use simplelog::{SimpleLogger, LevelFilter, Config};
-//use rocket::request::Form;
-use std::collections::HashMap;
-use std::fs;
-use std::io::{self, Read};
-use std::time::{Duration, Instant};
-use std::sync::{Arc, Mutex};
-use std::ops::Deref;
-
+// Constants
 const DATE_FORMAT : &str = "%Y/%m/%d %H:%M:%S%.3f";
 const DELIMETER : &str = "<!--REVISION HEADER DEMARCATION>";
+
+// types
 
 /// Command line configuration information
 #[derive(Debug)]
@@ -110,6 +122,77 @@ const SDF2 : &str = r#"{
 	]
 }"#;
 
+#[derive(Debug)]
+enum AuthState {
+    AuthNotAuth,
+    AuthUser,
+    AuthAdmin
+}
+impl FromStr for AuthState {
+    type Err = ();
+    fn from_str(input: &str) -> Result<AuthState, Self::Err> {
+        match input {
+            "AuthNotAuth"  => Ok(AuthState::AuthNotAuth),
+            "AuthUser"  => Ok(AuthState::AuthUser),
+            "AuthAdmin"  => Ok(AuthState::AuthAdmin),
+            _      => Ok(AuthState::AuthNotAuth),
+        }
+    }
+}
+impl AuthState {
+    fn jt_from_str(input: &str) -> AuthState {
+        match input {
+            "AuthNotAuth"  => AuthState::AuthNotAuth,
+            "AuthUser"  => AuthState::AuthUser,
+            "AuthAdmin"  => AuthState::AuthAdmin,
+            _      => AuthState::AuthNotAuth
+        }
+    }
+
+}
+impl fmt::Display for AuthState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", match self {
+            AuthState::AuthNotAuth => "AuthNotAuth",
+            AuthState::AuthUser => "AuthUser",
+            AuthState::AuthAdmin => "AuthAdmin",
+        })
+    }
+}
+
+#[derive(Debug)]
+struct User {
+    auth: AuthState,
+    name: String
+}
+impl<'a, 'r> FromRequest<'a, 'r> for User {
+    type Error = std::convert::Infallible;
+
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
+        error!("rq={:?}", request);
+        request.cookies()
+            .get_private("user_id")
+            .and_then(|cookie| {
+                error!("ck={:?}", cookie);
+                let mut vals = cookie.value().split("::");
+                let auth = vals.next().unwrap_or("AuthNotAuth");
+                let auth: AuthState = AuthState::jt_from_str(auth);
+//                let auth: AuthState = AuthState::AuthNotAuth;
+                let name = vals.next().unwrap_or("").to_string();
+                Some(User {auth, name})
+             })//.or_else(|| Some(User {auth: AuthState::AuthNotAuth, name: "nobody".to_string()}) )
+             /*
+            .map(|val : &str| {
+                let mut vals = val.split("::");
+//                let auth: AuthState = vals.next().unwrap_or("AuthNotAuth").from_string().unwrap_or(AuthState::AuthNotAuth);
+                let auth: AuthState = AuthState::AuthNotAuth;
+                let name = vals.next().unwrap_or("default").to_string();
+                User {auth, name}
+            })
+            */
+            .or_forward(())
+    }
+}
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
 struct LogData {
@@ -228,8 +311,8 @@ impl AuthStruct {
 }
 */
 struct RequestDelayStruct {
-    delay : Duration,
-    last : Instant
+    _delay : Duration,
+    _last : Instant
 }
 
 struct DelayMap ( Arc<Mutex<HashMap<String, RequestDelayStruct>>> );
@@ -248,6 +331,7 @@ impl Deref for PageMap {
         &self.0
     }
 }
+
 /// Loads information from the command line
 fn get_command_line() -> ConfigInfo {
     let matches = clap_app!(rtinywiki =>
@@ -276,33 +360,39 @@ fn rocket_route_js_debug_no_trunc(input: Json<LogData>) -> String {
     warn!("RustyWiki Dbg: {}", input.LogText);
     String::from("Ok t")
 }
+
 #[post("/jsLog/Debug", data = "<input>")]
 fn rocket_route_js_debug(input: Json<LogData>) -> String {
     let in_length = input.LogText.len();
     warn!("RustyWiki Dbg({}): {}", in_length, input.LogText.chars().take(256).collect::<String>());
     String::from("Ok d")
 }
+
 #[post("/jsLog/Error", data = "<input>")]
 fn rocket_route_js_error(input: Json<LogData>) -> String {
     error!("RustyWiki Err: {}", input.LogText.chars().collect::<String>());
     String::from("Ok")
 }
+
 #[post("/jsLog/Exception", data = "<input>")]
 fn rocket_route_js_exception(input: Json<LogData>) -> String {
     error!("RustyWiki Exc: {}", input.LogText.chars().collect::<String>());
     String::from("Ok")
 }
+
 #[post("/jsLog/<rq>", data = "<input>")]
 fn rocket_route_js_log(rq: &RawStr, input: String) -> String {
     info!("RustyWiki Log failed parse: {} {}", rq.as_str(), input);
     String::from("520")
 }
+
 #[post("/jsUser/UserModify", data = "<input>")]
 fn rocket_route_user_modify(input: Json<UserModify>) -> String {
     debug!("user modify {} {}", input.User, input.Password);
     // make sure user is authenticated
     String::from("Ok")
 }
+
 #[post("/jsUser/Wikisave", data = "<input>")]
 fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> Status {
     debug!("wiki save {} {}", input.Lock, input.PreviousRevision);
@@ -320,6 +410,7 @@ fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> 
     } else {
         return Status::new(521, "wrong lock");
     }
+    // TODO
     // make sure directory /wiki/input.page exists
     // open /wiki/input.page/input.revision
     // write data to file
@@ -328,6 +419,7 @@ fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> 
     // close file
     Status::Ok
 }
+
 #[post("/jsUser/Wikilock", data = "<input>")]
 fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
     if input.Page == "" || input.Lock == "" {
@@ -362,6 +454,7 @@ fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -
     info!("user lock {} {} = len={} res={:?}", input.Lock, input.Page, ct, res);
     Some(String::from("Ok"))
 }
+
 #[post("/jsAdmin/UserDelete", data = "<input>")]
 fn rocket_route_user_delete(input: Json<UserDelete>) -> String {
     debug!("user delete {}", input.User);
@@ -373,28 +466,91 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
     debug!("user upload {}", content_type);
     String::from("Ok")
 }
+
 #[get("/jsAdmin/MasterReset")]
 fn rocket_route_master_reset() -> String {
     debug!("master reset");
     String::from("Ok")
 }
+
 #[get("/page/MediaIndex")]
 fn rocket_route_media_index() -> String {
     debug!("media index");
     String::from("Ok")
 }
-#[get("/page/<page_name>")]
-fn rocket_route_page(page_name : String) -> io::Result<String> {
-    debug!("get page {}", page_name);
-    // TODO use the site setting in config
+
+#[get("/foo/<bar>")]
+fn test_path1(bar:String) -> String
+{
+    println!("got test path1 {:?}", bar);
+    "test string".to_string()
+}
+#[get("/foo/<bar>/<ack>")]
+fn test_path2(bar:String, ack: Option<String>) -> String
+{
+    println!("got test path {:?}--{:?}", bar, ack);
+    "test string".to_string()
+}
+
+#[get("/wiki/<page_name>/<version>")]
+fn rocket_route_page(page_name : String, version: Option<String>) -> io::Result<String> {
+    error!("page name");
+    // TODO use the StartPage setting in config
+    let version = version.unwrap_or("current".to_string());
+    let path_name = format!("site/wiki/{}/{}", page_name, version);
+    error!("get page {}", path_name);
+//    let (data, info) = loadFile(page_name);
 //    let mut file = File::open("site/index.html")?;
     //let mut buf = BufReader::new(file);
 //    let mut filedata = Vec::new();
-    let sdata = fs::read_to_string("site/index.html")?;
+   fs::read_to_string(path_name)
+//    let (data, info) = split_version(&sdata)?;
 //    let sdata = filedata.to_string();
-    Ok(sdata.replace("DUMMYSTARTPAGE", &page_name))
+//    Ok(sdata.replace("DUMMYSTARTPAGE", &page_name))
 //    Ok(sdata)
 }
+
+fn do_index() -> Option<File> {
+    let filename = "site/index.html";
+    File::open(&filename).ok()
+}
+
+#[get("/")]
+fn site_index1(user: User) -> Option<File> {
+    error!("got user info={:?}", user);
+    do_index()
+}
+#[get("/", rank = 2)]
+fn site_index1a(user: Option<User>) -> Response<'static> {
+    error!("got user 2={:?}", user);
+    let header = Header::new("WWW-Authenticate", "Basic realm=RWIKI");
+    let mut response = Response::new();
+//    let status = status::Unauthorized(Some("Please login"));
+//    response.set_status(status::Unauthorized(Some("Please login")));
+    response.set_status(Status::Unauthorized);
+    response.set_header(header);
+    response.set_sized_body(Cursor::new("Unauthorized!"));
+    response
+
+    
+//    do_index()
+}
+
+#[get("/index.html")]
+fn site_index2() -> Option<File> {
+    do_index()
+}
+#[get("/favicon.ico")]
+fn site_favicon() -> Option<File> {
+    let filename = "site/favicon.ico";
+    File::open(&filename).ok()
+}
+
+#[get("/login")]
+fn login() -> status::Unauthorized<&'static str> {
+    status::Unauthorized(Some("Please login"))
+}
+
 
 fn _testserde() {
     println!("testserde");
@@ -426,6 +582,7 @@ fn _testserde() {
     let s3 = serde_json::to_string(&al).unwrap();
     println!("s3 = {:?}", &s3);
 }
+
 fn load_auth() -> Option<AuthStruct> {
     Some(AuthStruct{     
         UserMap : HashMap::new(),
@@ -442,13 +599,14 @@ fn load_auth() -> Option<AuthStruct> {
         }
     })
 }
+
 fn gen_auth() -> AuthStruct {
     AuthStruct{     
         UserMap : HashMap::new(),
         Header : PageRevisionStruct {
-            Page : String::new(),
-            Revision : String::new(),
-            PreviousRevision : String::new(),
+            Page : "_user".to_string(),
+            Revision : "000000000".to_string(),
+            PreviousRevision : "000000000".to_string(),
             CreateDate : String::new(),
             RevisionDate : String::new(),
             RevisedBy : String::new(),
@@ -468,6 +626,7 @@ fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
         _ => Err("Bad versioned string")
     }
 }
+
 fn join_version(ver_str : &str, data_str : &str) -> String {
     let mut res = String::with_capacity(ver_str.len()+data_str.len()+11);
     res.push_str(ver_str);
@@ -489,13 +648,16 @@ fn create_rocket() -> rocket::Rocket {
     .manage(auth)
     .manage(delay_map)
     .manage(lock_map)
-    .mount("/", StaticFiles::from("site"))  // use the site value from config
-    .mount("/", routes![rocket_route_js_debug_no_trunc, 
+    .mount("/css", StaticFiles::from("site/css"))  // use the site value from config
+    .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
+    .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
+    .mount("/", routes![rocket_route_js_debug_no_trunc, site_index1, site_index1a, site_index2, site_favicon,
         rocket_route_js_debug, rocket_route_js_exception, rocket_route_js_error, rocket_route_js_log,
         rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
         rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
         rocket_route_media_index, rocket_route_page])
 }
+
 
 fn main() {
     let _config = get_command_line();
