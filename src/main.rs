@@ -19,10 +19,9 @@ use std::{
 use rocket::{
     Data,
     http::{ContentType, Cookie, Cookies, RawStr, Status, Header},
-    outcome::IntoOutcome,
     request::{self, Form, FlashMessage, FromRequest, Request},
     Response,
-    response::status,
+    response::{status, Redirect},
     State
 };
 
@@ -433,21 +432,30 @@ fn do_index() -> Option<File> {
 }
 
 #[get("/")]
-fn site_index1(user: User) -> Option<File> {
-    error!("got user info={:?}", user);
-    do_index()
+fn site_root() -> Redirect {
+    Redirect::to(uri!(site_top: "index.html"))
 }
-#[get("/", rank = 2)]
+
+#[get("/foo/xx")]
+fn site_index1(user: User) -> String {
+    error!("got authenticated xx-{:?}", user);
+    "got xx".to_string()
+}
+
+#[get("/foo/xx", rank = 2)]
 fn site_index1a(user: Option<User>) -> Response<'static> {
+    let mut response = Response::new();
+    if user.is_some() {
+        return response;
+    }
     error!("got user 2={:?}", user);
     let header = Header::new("WWW-Authenticate", "Basic realm=RWIKI");
-    let mut response = Response::new();
     response.set_status(Status::Unauthorized);
     response.set_header(header);
     response.set_sized_body(Cursor::new("Unauthorized!"));
     response
 }
-
+/*
 #[get("/index.html")]
 fn site_index2() -> Option<File> {
     do_index()
@@ -458,12 +466,23 @@ fn site_favicon() -> Option<File> {
     let filename = "site/favicon.ico";
     File::open(&filename).ok()
 }
+*/
+#[get("/<file_name>")]
+fn site_top(file_name: String) -> Option<File> {
+    if file_name!="index.html" &&
+    file_name!="favicon.ico" {
+        return None
+    }
+    let filename = format!("site/{}", file_name);
+    File::open(&filename).ok()
+}
 
+/*
 #[get("/login")]
 fn login() -> status::Unauthorized<&'static str> {
     status::Unauthorized(Some("Please login"))
 }
-
+*/
 fn load_auth() -> Option<AuthStruct> {
     Some(AuthStruct{     
         UserMap : HashMap::new(),
@@ -512,7 +531,7 @@ fn create_rocket() -> rocket::Rocket {
     .mount("/css", StaticFiles::from("site/css"))  // use the site value from config
     .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
     .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
-    .mount("/", routes![rocket_route_js_debug_no_trunc, site_index1, site_index1a, site_index2, site_favicon,
+    .mount("/", routes![rocket_route_js_debug_no_trunc, site_root, site_top, site_index1a, 
         rocket_route_js_debug, rocket_route_js_exception, rocket_route_js_error, rocket_route_js_log,
         rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
         rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
