@@ -34,7 +34,9 @@ use rocket_contrib::{
 // Modules
 #[cfg(test)] mod tests;
 mod auth;
+mod basic;
 use auth::{User, AuthState};
+
 
 
 // Constants

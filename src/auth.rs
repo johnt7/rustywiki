@@ -2,8 +2,10 @@ use std::{fmt, str::FromStr};
 use rocket::{
     http::{Cookie, hyper::header},
     request::{self, FromRequest, Request},
+    Outcome,
     outcome::IntoOutcome
 };
+use super::basic;
 
 #[derive(Debug)]
 pub enum AuthState {
@@ -58,10 +60,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
         if let Some(ai) = request.headers().get_one("Authorization") {
 //            let auth_info: header::Basic = header::Basic::from_str(ai);
             error!("basic={:?}", ai);
-            let foo = header::Basic::from_str(ai);
-            error!("got cred={:?}", foo);
-            if let Ok(cred) = foo {
-                error!("got cred={:?}", cred);
+//            let foo = header::Basic::from_str(ai);
+            let b = basic::BasicAuthRaw::from_request(request);
+            error!("got cred={:?}", b);
+            if let Outcome::Success(cred) = b {
+                error!("got cred={:?}, {}", cred.username, cred.password);
                 if cred.username == "root" {
                     request.cookies()
                     .add_private(Cookie::new("wiki_auth", cred.username))
