@@ -34,6 +34,8 @@ use rocket_contrib::{
 
 // Modules
 #[cfg(test)] mod tests;
+mod auth;
+use auth::{User, AuthState};
 
 
 // Constants
@@ -122,77 +124,7 @@ const SDF2 : &str = r#"{
 	]
 }"#;
 
-#[derive(Debug)]
-enum AuthState {
-    AuthNotAuth,
-    AuthUser,
-    AuthAdmin
-}
-impl FromStr for AuthState {
-    type Err = ();
-    fn from_str(input: &str) -> Result<AuthState, Self::Err> {
-        match input {
-            "AuthNotAuth"  => Ok(AuthState::AuthNotAuth),
-            "AuthUser"  => Ok(AuthState::AuthUser),
-            "AuthAdmin"  => Ok(AuthState::AuthAdmin),
-            _      => Ok(AuthState::AuthNotAuth),
-        }
-    }
-}
-impl AuthState {
-    fn jt_from_str(input: &str) -> AuthState {
-        match input {
-            "AuthNotAuth"  => AuthState::AuthNotAuth,
-            "AuthUser"  => AuthState::AuthUser,
-            "AuthAdmin"  => AuthState::AuthAdmin,
-            _      => AuthState::AuthNotAuth
-        }
-    }
 
-}
-impl fmt::Display for AuthState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self {
-            AuthState::AuthNotAuth => "AuthNotAuth",
-            AuthState::AuthUser => "AuthUser",
-            AuthState::AuthAdmin => "AuthAdmin",
-        })
-    }
-}
-
-#[derive(Debug)]
-struct User {
-    auth: AuthState,
-    name: String
-}
-impl<'a, 'r> FromRequest<'a, 'r> for User {
-    type Error = std::convert::Infallible;
-
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
-        error!("rq={:?}", request);
-        request.cookies()
-            .get_private("user_id")
-            .and_then(|cookie| {
-                error!("ck={:?}", cookie);
-                let mut vals = cookie.value().split("::");
-                let auth = vals.next().unwrap_or("AuthNotAuth");
-                let auth: AuthState = AuthState::jt_from_str(auth);
-//                let auth: AuthState = AuthState::AuthNotAuth;
-                let name = vals.next().unwrap_or("").to_string();
-                Some(User {auth, name})
-             })//.or_else(|| Some(User {auth: AuthState::AuthNotAuth, name: "nobody".to_string()}) )
-             /*
-            .map(|val : &str| {
-                let mut vals = val.split("::");
-//                let auth: AuthState = vals.next().unwrap_or("AuthNotAuth").from_string().unwrap_or(AuthState::AuthNotAuth);
-                let auth: AuthState = AuthState::AuthNotAuth;
-                let name = vals.next().unwrap_or("default").to_string();
-                User {auth, name}
-            })
-            */
-            .or_forward(())
-    }
-}
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
 struct LogData {
@@ -487,36 +419,13 @@ fn rocket_route_media_index() -> String {
     String::from("Ok")
 }
 
-#[get("/foo/<bar>")]
-fn test_path1(bar:String) -> String
-{
-    println!("got test path1 {:?}", bar);
-    "test string".to_string()
-}
-#[get("/foo/<bar>/<ack>")]
-fn test_path2(bar:String, ack: Option<String>) -> String
-{
-    println!("got test path {:?}--{:?}", bar, ack);
-    "test string".to_string()
-}
-
 #[get("/wiki/<page_name>/<version>")]
 fn rocket_route_page(page_name : String, version: Option<String>) -> io::Result<String> {
-    error!("page name");
-    // TODO use the StartPage setting in config
     let version = version.unwrap_or("current".to_string());
     let path_name = format!("site/wiki/{}/{}", page_name, version);
-    error!("get page {}", path_name);
-//    let (data, info) = loadFile(page_name);
-//    let mut file = File::open("site/index.html")?;
-    //let mut buf = BufReader::new(file);
-//    let mut filedata = Vec::new();
    fs::read_to_string(path_name)
-//    let (data, info) = split_version(&sdata)?;
-//    let sdata = filedata.to_string();
-//    Ok(sdata.replace("DUMMYSTARTPAGE", &page_name))
-//    Ok(sdata)
 }
+
 
 fn do_index() -> Option<File> {
     let filename = "site/index.html";
@@ -533,21 +442,17 @@ fn site_index1a(user: Option<User>) -> Response<'static> {
     error!("got user 2={:?}", user);
     let header = Header::new("WWW-Authenticate", "Basic realm=RWIKI");
     let mut response = Response::new();
-//    let status = status::Unauthorized(Some("Please login"));
-//    response.set_status(status::Unauthorized(Some("Please login")));
     response.set_status(Status::Unauthorized);
     response.set_header(header);
     response.set_sized_body(Cursor::new("Unauthorized!"));
     response
-
-    
-//    do_index()
 }
 
 #[get("/index.html")]
 fn site_index2() -> Option<File> {
     do_index()
 }
+
 #[get("/favicon.ico")]
 fn site_favicon() -> Option<File> {
     let filename = "site/favicon.ico";
@@ -557,38 +462,6 @@ fn site_favicon() -> Option<File> {
 #[get("/login")]
 fn login() -> status::Unauthorized<&'static str> {
     status::Unauthorized(Some("Please login"))
-}
-
-
-fn _testserde() {
-    println!("testserde");
-    let u1 = UserStruct {
-        User : "u1".to_string(),
-        Password : "u1p".to_string(), 
-        Salt : "u1s".to_string(), 
-        Comment : "u1c".to_string() 
-    };
-    let u2 = UserStruct {
-        User : "u2".to_string(),
-        Password : "u2p".to_string(), 
-        Salt : "u2s".to_string(), 
-        Comment : "u2c".to_string() 
-    };
-    println!("u1={:?}", u1);
-    let mut al = AuthlistStruct { Userlist: Vec::new() };
-    let serialized = serde_json::to_string(&u1).unwrap();
-    println!("serialized = {}", serialized);
-    al.Userlist.push(u1.clone());
-    al.Userlist.push(u2.clone());
-    let s2 = serde_json::to_string(&al).unwrap();
-    let al2 : AuthlistStruct = serde_json::from_str(&s2).unwrap();
-    println!("s2 = {}", s2);
-    println!("al2 = {:?}", al2);
-    let mut altest = load_auth().unwrap();
-    altest.UserMap.insert(u1.User.clone(), u1.clone());
-    altest.UserMap.insert(u2.User.clone(), u2.clone());
-    let s3 = serde_json::to_string(&al).unwrap();
-    println!("s3 = {:?}", &s3);
 }
 
 fn load_auth() -> Option<AuthStruct> {
@@ -625,26 +498,6 @@ fn gen_auth() -> AuthStruct {
     }
 }
 
-fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
-    let v: Vec<&str> = in_str.split(DELIMETER).collect();
-    match v.len() {
-        0 => Ok( ("", "") ),
-        1 => Ok( ("", v[0]) ),
-        2 => Ok( (v[0], v[1]) ),
-        _ => Err("Bad versioned string")
-    }
-}
-
-fn join_version(ver_str : &str, data_str : &str) -> String {
-    let mut res = String::with_capacity(ver_str.len()+data_str.len()+11);
-    res.push_str(ver_str);
-    res.push_str("\n");
-    res.push_str(DELIMETER);
-    res.push_str("\n");
-    res.push_str(data_str);
-    res
-}
-
 fn create_rocket() -> rocket::Rocket {
     let auth = match load_auth() {
         Some(a) => a,
@@ -671,4 +524,65 @@ fn main() {
     let _config = get_command_line();
     println!("got config={:?}", _config);
     create_rocket().launch();
+}
+
+
+
+
+
+//////////////////////////////////////////////////////
+/// Unused
+/// 
+
+
+fn _testserde() {
+    println!("testserde");
+    let u1 = UserStruct {
+        User : "u1".to_string(),
+        Password : "u1p".to_string(), 
+        Salt : "u1s".to_string(), 
+        Comment : "u1c".to_string() 
+    };
+    let u2 = UserStruct {
+        User : "u2".to_string(),
+        Password : "u2p".to_string(), 
+        Salt : "u2s".to_string(), 
+        Comment : "u2c".to_string() 
+    };
+    println!("u1={:?}", u1);
+    let mut al = AuthlistStruct { Userlist: Vec::new() };
+    let serialized = serde_json::to_string(&u1).unwrap();
+    println!("serialized = {}", serialized);
+    al.Userlist.push(u1.clone());
+    al.Userlist.push(u2.clone());
+    let s2 = serde_json::to_string(&al).unwrap();
+    let al2 : AuthlistStruct = serde_json::from_str(&s2).unwrap();
+    println!("s2 = {}", s2);
+    println!("al2 = {:?}", al2);
+    let mut altest = load_auth().unwrap();
+    altest.UserMap.insert(u1.User.clone(), u1.clone());
+    altest.UserMap.insert(u2.User.clone(), u2.clone());
+    let s3 = serde_json::to_string(&al).unwrap();
+    println!("s3 = {:?}", &s3);
+}
+
+
+fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
+    let v: Vec<&str> = in_str.split(DELIMETER).collect();
+    match v.len() {
+        0 => Ok( ("", "") ),
+        1 => Ok( ("", v[0]) ),
+        2 => Ok( (v[0], v[1]) ),
+        _ => Err("Bad versioned string")
+    }
+}
+
+fn join_version(ver_str : &str, data_str : &str) -> String {
+    let mut res = String::with_capacity(ver_str.len()+data_str.len()+11);
+    res.push_str(ver_str);
+    res.push_str("\n");
+    res.push_str(DELIMETER);
+    res.push_str("\n");
+    res.push_str(data_str);
+    res
 }
