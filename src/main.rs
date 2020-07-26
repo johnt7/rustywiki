@@ -386,6 +386,7 @@ fn rocket_route_js_log(rq: &RawStr, input: String) -> String {
     String::from("520")
 }
 
+// TODO
 #[post("/jsUser/UserModify", data = "<input>")]
 fn rocket_route_user_modify(input: Json<UserModify>) -> String {
     debug!("user modify {} {}", input.User, input.Password);
@@ -393,6 +394,7 @@ fn rocket_route_user_modify(input: Json<UserModify>) -> String {
     String::from("Ok")
 }
 
+// TODO
 #[post("/jsUser/Wikisave", data = "<input>")]
 fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> Status {
     debug!("wiki save {} {}", input.Lock, input.PreviousRevision);
@@ -420,6 +422,7 @@ fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> 
     Status::Ok
 }
 
+// TODO
 #[post("/jsUser/Wikilock", data = "<input>")]
 fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
     if input.Page == "" || input.Lock == "" {
@@ -435,6 +438,7 @@ fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> 
     Status::Ok
 }
 
+// TODO
 #[post("/jsUser/Wikiunlock", data = "<input>")]
 fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
      if input.Page == "" {
@@ -455,24 +459,28 @@ fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -
     Some(String::from("Ok"))
 }
 
+// TODO
 #[post("/jsAdmin/UserDelete", data = "<input>")]
 fn rocket_route_user_delete(input: Json<UserDelete>) -> String {
     debug!("user delete {}", input.User);
     String::from("Ok")
 }
 
+// TODO
 #[post("/jsUser/Upload", data = "<_input>")]
 fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String {
     debug!("user upload {}", content_type);
     String::from("Ok")
 }
 
+// TODO
 #[get("/jsAdmin/MasterReset")]
 fn rocket_route_master_reset() -> String {
     debug!("master reset");
     String::from("Ok")
 }
 
+// TODO
 #[get("/page/MediaIndex")]
 fn rocket_route_media_index() -> String {
     debug!("media index");
