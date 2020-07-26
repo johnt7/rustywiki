@@ -1,8 +1,10 @@
 use std::{fmt, str::FromStr};
 use rocket::{
+    http::{Cookie, hyper::header},
     request::{self, FromRequest, Request},
     outcome::IntoOutcome
 };
+
 #[derive(Debug)]
 pub enum AuthState {
     AuthNotAuth,
@@ -53,27 +55,31 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = std::convert::Infallible;
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
-        error!("rq={:?}", request);
+        if let Some(ai) = request.headers().get_one("Authorization") {
+//            let auth_info: header::Basic = header::Basic::from_str(ai);
+            error!("basic={:?}", ai);
+            let foo = header::Basic::from_str(ai);
+            error!("got cred={:?}", foo);
+            if let Ok(cred) = foo {
+                error!("got cred={:?}", cred);
+                if cred.username == "root" {
+                    request.cookies()
+                    .add_private(Cookie::new("wiki_auth", cred.username))
+                }
+            }
+        };
         request.cookies()
-            .get_private("user_id")
+            .get_private("wiki_auth")
             .and_then(|cookie| {
                 error!("ck={:?}", cookie);
-                let mut vals = cookie.value().split("::");
-                let auth = vals.next().unwrap_or("AuthNotAuth");
-                let auth: AuthState = AuthState::jt_from_str(auth);
-//                let auth: AuthState = AuthState::AuthNotAuth;
-                let name = vals.next().unwrap_or("").to_string();
+//                let mut vals = cookie.value().split("::");
+//                let auth = vals.next().unwrap_or("AuthNotAuth");
+                let auth = AuthState::AuthAdmin;
+//                let auth: AuthState = AuthState::jt_from_str(auth);
+//                let name = vals.next().unwrap_or("").to_string();
+                let name = cookie.value().to_string();
                 Some(User {auth, name})
-             })//.or_else(|| Some(User {auth: AuthState::AuthNotAuth, name: "nobody".to_string()}) )
-             /*
-            .map(|val : &str| {
-                let mut vals = val.split("::");
-//                let auth: AuthState = vals.next().unwrap_or("AuthNotAuth").from_string().unwrap_or(AuthState::AuthNotAuth);
-                let auth: AuthState = AuthState::AuthNotAuth;
-                let name = vals.next().unwrap_or("default").to_string();
-                User {auth, name}
-            })
-            */
+             })
             .or_forward(())
     }
 }
