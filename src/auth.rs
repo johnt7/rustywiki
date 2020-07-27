@@ -57,8 +57,24 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = std::convert::Infallible;
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
-        if let Some(ai) = request.headers().get_one("Authorization") {
-//            let auth_info: header::Basic = header::Basic::from_str(ai);
+        let mut ck = request.cookies();
+
+        let ac = ck.get_private("wiki_auth")
+
+      .or_else(|| {
+            let b = basic::BasicAuthRaw::from_request(request);
+            error!("got cred={:?}", b);
+            if let Outcome::Success(cred) = b {
+                error!("got cred={:?}, {}", cred.username, cred.password);
+//                let ck = request.cookies()
+                if cred.username == "root" {
+                    ck.add_private(Cookie::new("wiki_auth", cred.username))
+                }
+            };
+            ck.get_private("wiki_auth")
+        });
+ /*
+        if a {
             error!("basic={:?}", ai);
 //            let foo = header::Basic::from_str(ai);
             let b = basic::BasicAuthRaw::from_request(request);
@@ -73,7 +89,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
         };
         request.cookies()
             .get_private("wiki_auth")
-            .and_then(|cookie| {
+            */
+
+ //           request.cookies().get_private("wiki_auth")
+                ac.and_then(|cookie| {
                 error!("ck={:?}", cookie);
 //                let mut vals = cookie.value().split("::");
 //                let auth = vals.next().unwrap_or("AuthNotAuth");

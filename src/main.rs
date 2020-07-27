@@ -11,6 +11,7 @@ use std::{
     fs::{self, File},
     io::{self, Cursor},
     ops::Deref,
+    path::PathBuf,
     str::FromStr,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -21,7 +22,7 @@ use rocket::{
     http::{ContentType, Cookie, Cookies, RawStr, Status, Header},
     request::{self, Form, FlashMessage, FromRequest, Request},
     Response,
-    response::{status, Redirect},
+    response::{status, Redirect, Responder},
     State
 };
 
@@ -54,6 +55,14 @@ pub struct ConfigInfo {
     cert : String,
     key : String,
     port : u16
+}
+
+#[derive(Responder)]
+enum StringResponder {
+    #[response(status=200, content_type="text/html")]
+    Content(String),
+    #[response(status=500)]
+    Nothing(String)
 }
 
 /*
@@ -415,29 +424,56 @@ fn rocket_route_master_reset() -> String {
 
 // TODO
 #[get("/page/MediaIndex")]
-fn rocket_route_media_index() -> String {
+fn rocket_route_media_index(_user: User, ) -> String {
     debug!("media index");
     String::from("Ok")
 }
 
 #[get("/wiki/<page_name>/<version>")]
-fn rocket_route_page(page_name : String, version: Option<String>) -> io::Result<String> {
+fn rocket_route_wiki(_user: User, page_name : String, version: Option<String>) -> io::Result<String> {
     let version = version.unwrap_or("current".to_string());
     let path_name = format!("site/wiki/{}/{}", page_name, version);
    fs::read_to_string(path_name)
 }
 
-
-fn do_index() -> Option<File> {
-    let filename = "site/index.html";
-    File::open(&filename).ok()
+#[get("/page/<page_name>")]
+fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
+    let path_name = "site/index.html".to_string();
+    let mut response = Response::new();
+    response.set_header(Header::new("Content-Type", "text/html"));
+    match fs::read_to_string(&path_name) {
+        Err(err) => {
+            let err = format!("{}", err);
+            response.set_status(Status::InternalServerError);
+            error!("Could not load {}. Error-{}", path_name, err);
+            response.set_sized_body(Cursor::new(err));
+        },
+        Ok(index_str) => {
+            response.set_status(Status::Ok);
+            response.set_sized_body(Cursor::new(index_str.replace("DUMMYSTARTPAGE", &page_name)));
+        }
+    }   
+    response
+}
+/*
+#[get("/pagex/foo")]
+fn rocket_route_pagex() -> Response<'static> {
+    let path_name = "site/index.html".to_string();
+    let ids = fs::read_to_string(path_name).unwrap();
+    let header = Header::new("Content-Type", "text/html");
+    let mut response = Response::new();
+    response.set_status(Status::Ok);
+    response.set_header(header);
+    response.set_sized_body(Cursor::new(ids));
+    response
 }
 
+*/
 #[get("/")]
 fn site_root() -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
-
+/*
 #[get("/foo/xx")]
 fn site_index1(user: User) -> String {
     error!("got authenticated xx-{:?}", user);
@@ -457,7 +493,7 @@ fn site_index1a(user: Option<User>) -> Response<'static> {
     response.set_sized_body(Cursor::new("Unauthorized!"));
     response
 }
-/*
+
 #[get("/index.html")]
 fn site_index2() -> Option<File> {
     do_index()
@@ -469,8 +505,8 @@ fn site_favicon() -> Option<File> {
     File::open(&filename).ok()
 }
 */
-#[get("/<file_name>")]
-fn site_top(file_name: String) -> Option<File> {
+#[get("/<file_name>", rank=5)]
+fn site_top(_user: User, file_name: String) -> Option<File> {
     if file_name!="index.html" &&
     file_name!="favicon.ico" {
         return None
@@ -479,12 +515,39 @@ fn site_top(file_name: String) -> Option<File> {
     File::open(&filename).ok()
 }
 
-/*
-#[get("/login")]
-fn login() -> status::Unauthorized<&'static str> {
-    status::Unauthorized(Some("Please login"))
+#[get("/<_pathnames..>", rank = 20)] // high enough to be after the static files which are 10
+fn site_nonauth(user: Option<User>, _pathnames: PathBuf) -> Response<'static> {
+    let mut response = Response::new();
+    if user.is_some() {
+        response.set_status(Status::InternalServerError);
+        error!("Non auth, has auth user");
+        return response;
+    }
+    error!("got user 2={:?}", user);
+    let header = Header::new("WWW-Authenticate", "Basic realm=RWIKI");
+    response.set_status(Status::Unauthorized);
+    response.set_header(header);
+    response.set_sized_body(Cursor::new("Unauthorized!"));
+    response
 }
-*/
+
+#[get("/login", rank = 1)]
+fn login_user(_user: User) -> Redirect {
+    Redirect::to(uri!(site_top: "index.html"))
+}
+
+#[get("/login", rank = 2)]
+fn login_page() -> Option<File> {
+    let filename = format!("site/login.html");
+    File::open(&filename).ok()
+}
+
+#[post("/logout", rank = 1)]
+fn logout(mut cookies: Cookies<'_>) -> Redirect {
+    cookies.remove_private(Cookie::named("wiki_auth"));
+    Redirect::to(uri!(site_top: "index.html"))
+ }
+
 fn load_auth() -> Option<AuthStruct> {
     Some(AuthStruct{     
         UserMap : HashMap::new(),
@@ -533,11 +596,12 @@ fn create_rocket() -> rocket::Rocket {
     .mount("/css", StaticFiles::from("site/css"))  // use the site value from config
     .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
     .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
-    .mount("/", routes![rocket_route_js_debug_no_trunc, site_root, site_top, site_index1a, 
+    .mount("/", routes![rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
+        login_user, login_page, logout,
         rocket_route_js_debug, rocket_route_js_exception, rocket_route_js_error, rocket_route_js_log,
         rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
         rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
-        rocket_route_media_index, rocket_route_page])
+        rocket_route_media_index, rocket_route_page, rocket_route_wiki])
 }
 
 
