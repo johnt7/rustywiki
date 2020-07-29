@@ -531,23 +531,6 @@ fn site_nonauth(user: Option<User>, _pathnames: PathBuf) -> Response<'static> {
     response
 }
 
-#[get("/login", rank = 1)]
-fn login_user(_user: User) -> Redirect {
-    Redirect::to(uri!(site_top: "index.html"))
-}
-
-#[get("/login", rank = 2)]
-fn login_page() -> Option<File> {
-    let filename = format!("site/login.html");
-    File::open(&filename).ok()
-}
-
-#[post("/logout", rank = 1)]
-fn logout(mut cookies: Cookies<'_>) -> Redirect {
-    cookies.remove_private(Cookie::named("wiki_auth"));
-    Redirect::to(uri!(site_top: "index.html"))
- }
-
 fn load_auth() -> Option<AuthStruct> {
     Some(AuthStruct{     
         UserMap : HashMap::new(),
@@ -597,7 +580,6 @@ fn create_rocket() -> rocket::Rocket {
     .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
     .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
     .mount("/", routes![rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
-        login_user, login_page, logout,
         rocket_route_js_debug, rocket_route_js_exception, rocket_route_js_error, rocket_route_js_log,
         rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
         rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 

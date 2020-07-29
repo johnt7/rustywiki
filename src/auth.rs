@@ -54,54 +54,21 @@ pub struct User {
 }
 
 impl<'a, 'r> FromRequest<'a, 'r> for User {
-    type Error = std::convert::Infallible;
+    type Error = ();
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
-        let mut ck = request.cookies();
-
-        let ac = ck.get_private("wiki_auth")
-
-      .or_else(|| {
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<User, ()> {
             let b = basic::BasicAuthRaw::from_request(request);
             error!("got cred={:?}", b);
             if let Outcome::Success(cred) = b {
                 error!("got cred={:?}, {}", cred.username, cred.password);
-//                let ck = request.cookies()
-                if cred.username == "root" {
-                    ck.add_private(Cookie::new("wiki_auth", cred.username))
+                if cred.username == "root" && cred.password=="adm" {
+                    return Outcome::Success(User {auth: AuthState::AuthNotAuth, name: cred.username});
+                } else if cred.username == "user" && cred.password=="user" {
+                    return Outcome::Success(User {auth: AuthState::AuthUser, name: cred.username});
                 }
+
             };
-            ck.get_private("wiki_auth")
-        });
- /*
-        if a {
-            error!("basic={:?}", ai);
-//            let foo = header::Basic::from_str(ai);
-            let b = basic::BasicAuthRaw::from_request(request);
-            error!("got cred={:?}", b);
-            if let Outcome::Success(cred) = b {
-                error!("got cred={:?}, {}", cred.username, cred.password);
-                if cred.username == "root" {
-                    request.cookies()
-                    .add_private(Cookie::new("wiki_auth", cred.username))
-                }
-            }
-        };
-        request.cookies()
-            .get_private("wiki_auth")
-            */
-
- //           request.cookies().get_private("wiki_auth")
-                ac.and_then(|cookie| {
-                error!("ck={:?}", cookie);
-//                let mut vals = cookie.value().split("::");
-//                let auth = vals.next().unwrap_or("AuthNotAuth");
-                let auth = AuthState::AuthAdmin;
-//                let auth: AuthState = AuthState::jt_from_str(auth);
-//                let name = vals.next().unwrap_or("").to_string();
-                let name = cookie.value().to_string();
-                Some(User {auth, name})
-             })
-            .or_forward(())
-    }
+            Outcome::Forward(())
+//            Outcome::failure(Status::BadRequest)
+        }
 }
