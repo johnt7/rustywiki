@@ -542,6 +542,16 @@ fn login_page() -> Option<File> {
     File::open(&filename).ok()
 }
 
+#[post("/login", data = "<login>")]
+fn login(mut cookies: Cookies<'_>, login: Form<Login>) -> Result<Redirect, ())> {
+    if login.username == "Sergio" && login.password == "password" {
+        cookies.add_private(Cookie::new("user_id", 1.to_string()));
+        Ok(Redirect::to(uri!(index)))
+    } else {
+        Err(())
+    }
+}
+
 #[post("/logout", rank = 1)]
 fn logout(mut cookies: Cookies<'_>) -> Redirect {
     cookies.remove_private(Cookie::named("wiki_auth"));

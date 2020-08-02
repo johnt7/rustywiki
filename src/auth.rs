@@ -92,7 +92,8 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
             */
 
  //           request.cookies().get_private("wiki_auth")
-                ac.and_then(|cookie| {
+             let ac = ck.get_private("wiki_auth")
+                .and_then(|cookie| {
                 error!("ck={:?}", cookie);
 //                let mut vals = cookie.value().split("::");
 //                let auth = vals.next().unwrap_or("AuthNotAuth");
