@@ -1,10 +1,11 @@
 use std::{fmt, str::FromStr};
 use rocket::{
     http::{Cookies, Cookie},
-    request::{self, FromRequest, Request},
     Outcome,
+    request::{self, FromRequest, Request},
+    State
  };
-
+use super::authstruct::AuthStruct;
 
 #[derive(Debug)]
 pub enum AuthState {
@@ -65,12 +66,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = ();
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
+        let users_info = request.guard::<State<AuthStruct>>().unwrap().inner().lock().unwrap();
+        error!("from user: hmlen={}", users_info.UserMap.len());
         let res = request.cookies().get_private("wiki_auth")
         .and_then(|cookie| {
-//            error!("got cooke val={:?}", cookie.value());
+            error!("got cooke val={:?}", cookie.value());
             User::from_str(cookie.value()).ok()
         });
-//        error!("fr1: {:?}", res);
+        error!("fr1: {:?}", res);
         match res {
             Some(user) => Outcome::Success(user),
             None => Outcome::Forward(())

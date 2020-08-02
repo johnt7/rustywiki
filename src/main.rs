@@ -34,7 +34,9 @@ use rocket_contrib::{
 #[cfg(test)] mod tests;
 mod auth;
 mod basic;
+mod authstruct;
 use auth::{User, AuthState};
+use authstruct::{AuthStruct, UserStruct};
 
 
 
@@ -217,55 +219,6 @@ struct AuthlistStruct {
     Userlist : Vec<UserStruct>
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-struct PageRevisionStruct {
-	Page : String,
-	Revision : String,
-	PreviousRevision : String,
-	CreateDate : String,
-	RevisionDate : String,
-	RevisedBy : String,
-	Comment : String,
-	Lock : String,
-	Data : String
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[allow(non_snake_case)]
-struct UserStruct {
-	User : String, 
-	Password : String, 
-	Salt : String, 
-	Comment : String 
-}
-
-struct AuthStruct (Arc<Mutex<AuthStructInternal>>);
-impl Deref for AuthStruct {
-    type Target = Arc<Mutex<AuthStructInternal>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-#[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-struct AuthStructInternal {
-    UserMap : HashMap<String, UserStruct>,
-    Header : PageRevisionStruct
-}
-/*
-impl AuthStruct {
-    fn save_to_string(&self) -> String {
-        let ul : 5;
-        let mut res_str = String::new();
-        hdr = serde_json::to_string(self.Header).unwrap();
-        res_str.append(self.UserMap);
-        res_str.append(&DELIM)
-        res_str
-    }
-}
-*/
 struct RequestDelayStruct {
     _delay : Duration,
     _last : Instant
@@ -576,44 +529,12 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
  }
 
-fn load_auth() -> Option<AuthStruct> {
-    Some(AuthStruct(Arc::new(Mutex::new(AuthStructInternal{     
-        UserMap : HashMap::new(),
-        Header : PageRevisionStruct {
-            Page : String::new(),
-            Revision : String::new(),
-            PreviousRevision : String::new(),
-            CreateDate : String::new(),
-            RevisionDate : String::new(),
-            RevisedBy : String::new(),
-            Comment : String::new(),
-            Lock : String::new(),
-            Data : String::new()
-        }
-    }))))
-}
 
-fn gen_auth() -> AuthStruct {
-    AuthStruct(Arc::new(Mutex::new(AuthStructInternal{     
-        UserMap : HashMap::new(),
-        Header : PageRevisionStruct {
-            Page : "_user".to_string(),
-            Revision : "000000000".to_string(),
-            PreviousRevision : "000000000".to_string(),
-            CreateDate : String::new(),
-            RevisionDate : String::new(),
-            RevisedBy : String::new(),
-            Comment : String::new(),
-            Lock : String::new(),
-            Data : String::new()
-        }
-    })))
-}
 
 fn create_rocket() -> rocket::Rocket {
-    let auth = match load_auth() {
+    let auth = match authstruct::load_auth() {
         Some(a) => a,
-        None => gen_auth()
+        None => authstruct::gen_auth()
     };
     let delay_map = DelayMap ( Arc::new(Mutex::new(HashMap::new())) );
     let lock_map = PageMap ( Arc::new(Mutex::new(HashMap::new())) );
@@ -672,7 +593,7 @@ fn _testserde() {
     let al2 : AuthlistStruct = serde_json::from_str(&s2).unwrap();
     println!("s2 = {}", s2);
     println!("al2 = {:?}", al2);
-    let altest = load_auth().unwrap();
+    let altest = authstruct::load_auth().unwrap();
     altest.lock().unwrap().UserMap.insert(u1.User.clone(), u1.clone());
     altest.lock().unwrap().UserMap.insert(u2.User.clone(), u2.clone());
     let s3 = serde_json::to_string(&al).unwrap();
