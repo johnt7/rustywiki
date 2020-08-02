@@ -7,12 +7,10 @@
 
 use std::{
     collections::HashMap,
-    fmt,
     fs::{self, File},
     io::{self, Cursor},
     ops::Deref,
-    path::PathBuf,
-    str::FromStr,
+    path::*,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -20,9 +18,9 @@ use std::{
 use rocket::{
     Data,
     http::{ContentType, Cookie, Cookies, RawStr, Status, Header},
-    request::{self, Form, FlashMessage, FromRequest, Request},
+    request::Form,
     Response,
-    response::{status, Redirect, Responder},
+    response::{Redirect, Responder},
     State
 };
 
@@ -57,6 +55,8 @@ pub struct ConfigInfo {
     port : u16
 }
 
+/*
+
 #[derive(Responder)]
 enum StringResponder {
     #[response(status=200, content_type="text/html")]
@@ -64,6 +64,7 @@ enum StringResponder {
     #[response(status=500)]
     Nothing(String)
 }
+*/
 
 /*
 #[derive(FromForm)]
@@ -174,6 +175,11 @@ struct Wikilock {
 }
 
 #[derive(FromForm)]
+struct Login {
+    username: String,
+    password: String
+}
+#[derive(FromForm)]
 #[allow(non_snake_case)]
 struct Upload {
     uploadfile : String,
@@ -234,9 +240,17 @@ struct UserStruct {
 	Comment : String 
 }
 
+struct AuthStruct (Arc<Mutex<AuthStructInternal>>);
+impl Deref for AuthStruct {
+    type Target = Arc<Mutex<AuthStructInternal>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
-struct AuthStruct {
+struct AuthStructInternal {
     UserMap : HashMap<String, UserStruct>,
     Header : PageRevisionStruct
 }
@@ -516,8 +530,10 @@ fn site_top(_user: User, file_name: String) -> Option<File> {
 }
 
 #[get("/<_pathnames..>", rank = 20)] // high enough to be after the static files which are 10
-fn site_nonauth(user: Option<User>, _pathnames: PathBuf) -> Response<'static> {
-    let mut response = Response::new();
+fn site_nonauth(_pathnames: PathBuf) -> Redirect {
+   Redirect::to(uri!(site_top: "login.html"))
+//    let mut response = Response::new();
+     /*
     if user.is_some() {
         response.set_status(Status::InternalServerError);
         error!("Non auth, has auth user");
@@ -529,26 +545,28 @@ fn site_nonauth(user: Option<User>, _pathnames: PathBuf) -> Response<'static> {
     response.set_header(header);
     response.set_sized_body(Cursor::new("Unauthorized!"));
     response
+    */
 }
 
-#[get("/login", rank = 1)]
+#[get("/login.html", rank = 1)]
 fn login_user(_user: User) -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
 
-#[get("/login", rank = 2)]
+#[get("/login.html", rank = 2)]
 fn login_page() -> Option<File> {
     let filename = format!("site/login.html");
     File::open(&filename).ok()
 }
 
 #[post("/login", data = "<login>")]
-fn login(mut cookies: Cookies<'_>, login: Form<Login>) -> Result<Redirect, ())> {
-    if login.username == "Sergio" && login.password == "password" {
-        cookies.add_private(Cookie::new("user_id", 1.to_string()));
-        Ok(Redirect::to(uri!(index)))
+fn login(mut cookies: Cookies<'_>, login: Form<Login>) -> Result<Redirect, ()> {
+    if let Some(_) = auth::login_handle(&login.username, &login.password, &mut cookies) {
+        error!("handled login");
+        Ok(Redirect::to(uri!(site_top: "index.html")))
     } else {
-        Err(())
+        error!("failed login");
+        Ok(Redirect::to(uri!(site_top: "login.html")))
     }
 }
 
@@ -559,7 +577,7 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
  }
 
 fn load_auth() -> Option<AuthStruct> {
-    Some(AuthStruct{     
+    Some(AuthStruct(Arc::new(Mutex::new(AuthStructInternal{     
         UserMap : HashMap::new(),
         Header : PageRevisionStruct {
             Page : String::new(),
@@ -572,11 +590,11 @@ fn load_auth() -> Option<AuthStruct> {
             Lock : String::new(),
             Data : String::new()
         }
-    })
+    }))))
 }
 
 fn gen_auth() -> AuthStruct {
-    AuthStruct{     
+    AuthStruct(Arc::new(Mutex::new(AuthStructInternal{     
         UserMap : HashMap::new(),
         Header : PageRevisionStruct {
             Page : "_user".to_string(),
@@ -589,7 +607,7 @@ fn gen_auth() -> AuthStruct {
             Lock : String::new(),
             Data : String::new()
         }
-    }
+    })))
 }
 
 fn create_rocket() -> rocket::Rocket {
@@ -607,7 +625,7 @@ fn create_rocket() -> rocket::Rocket {
     .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
     .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
     .mount("/", routes![rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
-        login_user, login_page, logout,
+        login_user, login_page, logout, login,
         rocket_route_js_debug, rocket_route_js_exception, rocket_route_js_error, rocket_route_js_log,
         rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
         rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
@@ -654,9 +672,9 @@ fn _testserde() {
     let al2 : AuthlistStruct = serde_json::from_str(&s2).unwrap();
     println!("s2 = {}", s2);
     println!("al2 = {:?}", al2);
-    let mut altest = load_auth().unwrap();
-    altest.UserMap.insert(u1.User.clone(), u1.clone());
-    altest.UserMap.insert(u2.User.clone(), u2.clone());
+    let altest = load_auth().unwrap();
+    altest.lock().unwrap().UserMap.insert(u1.User.clone(), u1.clone());
+    altest.lock().unwrap().UserMap.insert(u2.User.clone(), u2.clone());
     let s3 = serde_json::to_string(&al).unwrap();
     println!("s3 = {:?}", &s3);
 }
