@@ -533,8 +533,8 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
 
 fn create_rocket() -> rocket::Rocket {
     let auth = match authstruct::load_auth() {
-        Some(a) => a,
-        None => authstruct::gen_auth()
+        Ok(a) => a,
+        _ => authstruct::gen_auth()
     };
     let delay_map = DelayMap ( Arc::new(Mutex::new(HashMap::new())) );
     let lock_map = PageMap ( Arc::new(Mutex::new(HashMap::new())) );
@@ -594,8 +594,8 @@ fn _testserde() {
     println!("s2 = {}", s2);
     println!("al2 = {:?}", al2);
     let altest = authstruct::load_auth().unwrap();
-    altest.lock().unwrap().UserMap.insert(u1.User.clone(), u1.clone());
-    altest.lock().unwrap().UserMap.insert(u2.User.clone(), u2.clone());
+    altest.lock().unwrap().user_map.insert(u1.User.clone(), u1.clone());
+    altest.lock().unwrap().user_map.insert(u2.User.clone(), u2.clone());
     let s3 = serde_json::to_string(&al).unwrap();
     println!("s3 = {:?}", &s3);
 }
@@ -604,8 +604,8 @@ fn _testserde() {
 fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
     let v: Vec<&str> = in_str.split(DELIMETER).collect();
     match v.len() {
-        0 => Ok( ("", "") ),
-        1 => Ok( ("", v[0]) ),
+//        0 => Ok( ("", "") ),
+//        1 => Ok( ("", v[0]) ),
         2 => Ok( (v[0], v[1]) ),
         _ => Err("Bad versioned string")
     }
