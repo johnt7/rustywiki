@@ -67,7 +67,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
         let users_info = request.guard::<State<AuthStruct>>().unwrap().inner().lock().unwrap();
-        error!("from user: hmlen={}", users_info.UserMap.len());
+        error!("from user: hmlen={}", users_info.user_map.len());
         let res = request.cookies().get_private("wiki_auth")
         .and_then(|cookie| {
             error!("got cooke val={:?}", cookie.value());
