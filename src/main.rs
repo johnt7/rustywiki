@@ -138,55 +138,43 @@ const SDF2 : &str = r#"{
 }"#;
 
 
-#[serde(rename_all = "PascalCase")]
 #[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
 struct LogData {
     log_text: String,
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
 struct UserModify {
-    #[serde(rename = "User")]
     user: String,
-    #[serde(rename = "Password")]
     password: String,
-    #[serde(rename = "NewPassword")]
     new_password: String,
-    #[serde(rename = "NewPasswordCheck")]
     new_password_check: String,
-    #[serde(rename = "Comment")]
     comment: String
 }
 
-#[serde(rename_all = "PascalCase")]
 #[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
 struct Wikisave {
 //    #[serde(rename = "Page")]
     page : String,
-//    #[serde(rename = "Revision")]
     revision : String,
-//    #[serde(rename = "PreviousRevision")]
     previous_revision : String,
-//    #[serde(rename = "CreateDate")]
     create_date : String,
-//    #[serde(rename = "RevisionDate")]
     revision_date : String,
-//    #[serde(rename = "RevisedBy")]
     revised_by : String,
-//    #[serde(rename = "Comment")]
     comment : String,
-//    #[serde(rename = "Lock")]
     lock : String,
-//    #[serde(rename = "Data")]
     data : String
 }
 
 // also acts as unlock
 #[derive(Clone, Deserialize, Debug)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "PascalCase")]
 struct Wikilock {
- Page : String,
- Lock : String
+ page : String,
+ lock : String
 }
 
 #[derive(FromForm)]
@@ -203,32 +191,29 @@ struct _Upload {
 }
 
 #[derive(Deserialize)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "PascalCase")]
 struct UserDelete {
- User : String
+ user : String
 }
 
 #[derive(Deserialize, Serialize)]
-#[allow(non_camel_case_types)]
-#[allow(non_snake_case)]
-struct onfigurationStruct {
-	CaseSensitive : bool, // This should be set if the file system and thus wiki page names are case sensitive. If in doubt set to false.
-	AuthenticationRequiredForRead : bool, // If true unautheticated users can read wiki pages
-	AuthenticationRequiredForLogging : bool, // Allows unauthenticated users to log debug. This is a potential denial of service vector.
-	AllowMediaOverwrite : bool, // Set to true to allow the overwriting media files on uploads.
-	StartPage : String, // the page loaded by default as the starting wiki page.
-	NumberOfConcurrentLocks : u32, // The number of pages which can be concurrently locked for editing.
-	MaxNumberOfUsers : u32, // The maximum number of users
-	MaxVelocity : u32, // Minimum time in nanoseconds between authenticated requests from an IP address
-	UnauthMaxVelocity : u32, // Minimum time in nanoseconds between unauthenticated requests from an IP address
-	AdminUsers : Vec<String>, // An array of admin user names
-	AdminPages : Vec<String> // An array of pages and rest calls only available to admim users
+#[serde(rename_all = "PascalCase")]
+struct ConfigurationStruct {
+	case_sensitive : bool, // This should be set if the file system and thus wiki page names are case sensitive. If in doubt set to false.
+	authenticationequired_for_read : bool, // If true unautheticated users can read wiki pages
+	authentication_required_for_logging : bool, // Allows unauthenticated users to log debug. This is a potential denial of service vector.
+	allow_media_overwrite : bool, // Set to true to allow the overwriting media files on uploads.
+	start_page : String, // the page loaded by default as the starting wiki page.
+	number_of_concurrent_locks : u32, // The number of pages which can be concurrently locked for editing.
+	max_number_of_users : u32, // The maximum number of users
+	max_velocity : u32, // Minimum time in nanoseconds between authenticated requests from an IP address
+	unauth_max_velocity : u32, // Minimum time in nanoseconds between unauthenticated requests from an IP address
+	admin_users : Vec<String>, // An array of admin user names
+	admin_pages : Vec<String> // An array of pages and rest calls only available to admim users
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
 struct AuthlistStruct {
-    #[serde(rename = "user_list")]
     user_list : Vec<UserStruct>
 }
 
@@ -347,14 +332,14 @@ fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> 
 // TODO
 #[post("/jsUser/Wikilock", data = "<input>")]
 fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
-    if input.Page == "" || input.Lock == "" {
+    if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock page");
     }
     let mut mp = lock_data.lock().unwrap();
-    if let Some(_) = mp.get(&input.Page) {
+    if let Some(_) = mp.get(&input.page) {
         return Status::new(520, "already locked");
     }
-    let res = mp.insert(input.Page.clone(), input.Lock.clone());
+    let res = mp.insert(input.page.clone(), input.lock.clone());
     let ct = mp.len();
     info!("user lock len = {} res={:?}", ct, res);
     Status::Ok
@@ -363,28 +348,28 @@ fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> 
 // TODO
 #[post("/jsUser/Wikiunlock", data = "<input>")]
 fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
-     if input.Page == "" {
+     if input.page == "" {
         return None;
     }
     let mut mp = lock_data.lock().unwrap();
-    if let Some(ll) = mp.get(&input.Page) {
-        if ll != &input.Lock {
+    if let Some(ll) = mp.get(&input.page) {
+        if ll != &input.lock {
             return None;
         }
     } else {
         return None;
     }
-    let res = mp.remove(&input.Page);
+    let res = mp.remove(&input.page);
 
     let ct = mp.len();
-    info!("user lock {} {} = len={} res={:?}", input.Lock, input.Page, ct, res);
+    info!("user lock {} {} = len={} res={:?}", input.lock, input.page, ct, res);
     Some(String::from("Ok"))
 }
 
 // TODO
 #[post("/jsAdmin/UserDelete", data = "<input>")]
 fn rocket_route_user_delete(input: Json<UserDelete>) -> String {
-    debug!("user delete {}", input.User);
+    debug!("user delete {}", input.user);
     String::from("Ok")
 }
 
@@ -435,56 +420,12 @@ fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
     }   
     response
 }
-/*
-#[get("/pagex/foo")]
-fn rocket_route_pagex() -> Response<'static> {
-    let path_name = "site/index.html".to_string();
-    let ids = fs::read_to_string(path_name).unwrap();
-    let header = Header::new("Content-Type", "text/html");
-    let mut response = Response::new();
-    response.set_status(Status::Ok);
-    response.set_header(header);
-    response.set_sized_body(Cursor::new(ids));
-    response
-}
 
-*/
 #[get("/")]
 fn site_root() -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
-/*
-#[get("/foo/xx")]
-fn site_index1(user: User) -> String {
-    error!("got authenticated xx-{:?}", user);
-    "got xx".to_string()
-}
 
-#[get("/foo/xx", rank = 2)]
-fn site_index1a(user: Option<User>) -> Response<'static> {
-    let mut response = Response::new();
-    if user.is_some() {
-        return response;
-    }
-    error!("got user 2={:?}", user);
-    let header = Header::new("WWW-Authenticate", "Basic realm=RWIKI");
-    response.set_status(Status::Unauthorized);
-    response.set_header(header);
-    response.set_sized_body(Cursor::new("Unauthorized!"));
-    response
-}
-
-#[get("/index.html")]
-fn site_index2() -> Option<File> {
-    do_index()
-}
-
-#[get("/favicon.ico")]
-fn site_favicon() -> Option<File> {
-    let filename = "site/favicon.ico";
-    File::open(&filename).ok()
-}
-*/
 #[get("/<file_name>", rank=5)]
 fn site_top(_user: User, file_name: String) -> Option<File> {
     if file_name!="index.html" &&
@@ -498,20 +439,6 @@ fn site_top(_user: User, file_name: String) -> Option<File> {
 #[get("/<_pathnames..>", rank = 20)] // high enough to be after the static files which are 10
 fn site_nonauth(_pathnames: PathBuf) -> Redirect {
    Redirect::to(uri!(site_top: "login.html"))
-//    let mut response = Response::new();
-     /*
-    if user.is_some() {
-        response.set_status(Status::InternalServerError);
-        error!("Non auth, has auth user");
-        return response;
-    }
-    error!("got user 2={:?}", user);
-    let header = Header::new("WWW-Authenticate", "Basic realm=RWIKI");
-    response.set_status(Status::Unauthorized);
-    response.set_header(header);
-    response.set_sized_body(Cursor::new("Unauthorized!"));
-    response
-    */
 }
 
 #[get("/login.html", rank = 1)]
@@ -549,7 +476,6 @@ fn create_rocket() -> rocket::Rocket {
     let auth = match authstruct::load_auth() {
         Ok(a) => a,
         _ => panic!("failed load uinfo")
-//        _ => authstruct::gen_auth()
     };
     println!("auth={:?}", auth);
     let delay_map = DelayMap ( Arc::new(Mutex::new(HashMap::new())) );
@@ -571,13 +497,19 @@ fn create_rocket() -> rocket::Rocket {
 
 
 fn main() {
-//    _testserde();
-    let _config = get_command_line();
+   let _config = get_command_line();
     println!("got config={:?}", _config);
     create_rocket().launch();
 }
 
 
+fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
+    let v: Vec<&str> = in_str.split(DELIMETER).collect();
+    match v.len() {
+        2 => Ok( (v[0], v[1]) ),
+        _ => Err("Bad versioned string")
+    }
+}
 
 
 
@@ -636,13 +568,6 @@ fn _testserde() {
 }
 
 
-fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
-    let v: Vec<&str> = in_str.split(DELIMETER).collect();
-    match v.len() {
-        2 => Ok( (v[0], v[1]) ),
-        _ => Err("Bad versioned string")
-    }
-}
 
 fn _join_version(ver_str : &str, data_str : &str) -> String {
     let mut res = String::with_capacity(ver_str.len()+data_str.len()+11);
