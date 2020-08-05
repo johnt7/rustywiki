@@ -27,21 +27,18 @@ pub struct AuthStructInternal {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Wrapper {
-    pub Userlist: Vec<UserStruct>
+    #[serde(rename = "Userlist")]
+    pub user_list: Vec<UserStruct>
 }
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UserList(pub Vec<UserStruct>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "PascalCase")]
 pub struct UserStruct {
-	pub User : String, 
-	pub Password : String, 
-	pub Salt : String, 
-	pub Comment : String 
+	pub user : String, 
+	pub password : String, 
+	pub salt : String, 
+	pub comment : String 
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
@@ -66,7 +63,8 @@ fn load_parts<P: AsRef<Path>>(path: P) -> Result<(String, String), Box<dyn error
 pub fn load_auth() -> Result<AuthStruct, Box<dyn error::Error>> {
     if let Ok((um, hdr)) = load_parts("site/wiki/_user/current") {
         let umwin: Wrapper = serde_json::from_str(&um)?;
-        let umap = umwin.Userlist.iter().map(|us| (us.User.clone(), us.clone())).collect();
+        // TODO, examine to see about cleaning this code up a bit
+        let umap = umwin.user_list.iter().map(|us| (us.user.clone(), us.clone())).collect();
         return Ok(AuthStruct(Arc::new(Mutex::new(AuthStructInternal{user_map: umap, header: serde_json::from_str(&hdr)?}))))
     }
     Err("Failed to load".into())

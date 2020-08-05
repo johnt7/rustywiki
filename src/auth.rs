@@ -76,7 +76,7 @@ pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &Au
     let thing = &umap.lock().unwrap().user_map;
     // TODO handle no auth case
     let entry = thing.get(uname)?;
-    if entry.Password != pwd { return None };
+    if entry.password != pwd { return None };
     let u_tok = User{auth: AuthState::AuthAdmin, name: uname.to_string()}; // TODO get auth from list of admin
     cookies.add_private(Cookie::new("wiki_auth", u_tok.to_string()));
     Some(u_tok)

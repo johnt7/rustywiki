@@ -35,7 +35,7 @@ use rocket_contrib::{
 mod auth;
 mod basic;
 mod authstruct;
-use auth::{User, AuthState};
+use auth::{User};
 use authstruct::{AuthStruct, UserStruct};
 
 
@@ -121,7 +121,7 @@ const SDF2 : &str = r#"{
 }
 <!--REVISION HEADER DEMARCATION>
 {
-	"Userlist": [
+	"user_list": [
 		{
 			"User": "user",
 			"Password": "pwd",
@@ -138,34 +138,47 @@ const SDF2 : &str = r#"{
 }"#;
 
 
+#[serde(rename_all = "PascalCase")]
 #[derive(Deserialize)]
-#[allow(non_snake_case)]
 struct LogData {
-    LogText: String,
+    log_text: String,
 }
 
 #[derive(Deserialize)]
-#[allow(non_snake_case)]
-struct _UserModify {
- User: String,
- Password: String,
- NewPassword: String,
- NewPasswordCheck: String,
- Comment: String
+struct UserModify {
+    #[serde(rename = "User")]
+    user: String,
+    #[serde(rename = "Password")]
+    password: String,
+    #[serde(rename = "NewPassword")]
+    new_password: String,
+    #[serde(rename = "NewPasswordCheck")]
+    new_password_check: String,
+    #[serde(rename = "Comment")]
+    comment: String
 }
 
+#[serde(rename_all = "PascalCase")]
 #[derive(Deserialize)]
-#[allow(non_snake_case)]
-struct _Wikisave {
- Page : String,
- Revision : String,
- PreviousRevision : String,
- CreateDate : String,
- RevisionDate : String,
- RevisedBy : String,
- Comment : String,
- Lock : String,
- Data : String
+struct Wikisave {
+//    #[serde(rename = "Page")]
+    page : String,
+//    #[serde(rename = "Revision")]
+    revision : String,
+//    #[serde(rename = "PreviousRevision")]
+    previous_revision : String,
+//    #[serde(rename = "CreateDate")]
+    create_date : String,
+//    #[serde(rename = "RevisionDate")]
+    revision_date : String,
+//    #[serde(rename = "RevisedBy")]
+    revised_by : String,
+//    #[serde(rename = "Comment")]
+    comment : String,
+//    #[serde(rename = "Lock")]
+    lock : String,
+//    #[serde(rename = "Data")]
+    data : String
 }
 
 // also acts as unlock
@@ -181,13 +194,12 @@ struct Login {
     username: String,
     password: String
 }
-#[derive(FromForm)]
-#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize,FromForm)]
 struct _Upload {
     uploadfile : String,
     token : String,
-    #[allow(non_snake_case)]
-    imageName : String
+    #[serde(rename = "imageName")]
+    image_name : String
 }
 
 #[derive(Deserialize)]
@@ -216,7 +228,8 @@ struct onfigurationStruct {
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 struct AuthlistStruct {
-    Userlist : Vec<UserStruct>
+    #[serde(rename = "user_list")]
+    user_list : Vec<UserStruct>
 }
 
 struct RequestDelayStruct {
@@ -266,26 +279,26 @@ fn get_command_line() -> ConfigInfo {
 
 #[post("/jsLog/DebugNoTrunc", data = "<input>", rank=1)]
 fn rocket_route_js_debug_no_trunc(input: Json<LogData>) -> String {
-    warn!("RustyWiki Dbg: {}", input.LogText);
+    warn!("RustyWiki Dbg: {}", input.log_text);
     String::from("Ok t")
 }
 
 #[post("/jsLog/Debug", data = "<input>")]
 fn rocket_route_js_debug(input: Json<LogData>) -> String {
-    let in_length = input.LogText.len();
-    warn!("RustyWiki Dbg({}): {}", in_length, input.LogText.chars().take(256).collect::<String>());
+    let in_length = input.log_text.len();
+    warn!("RustyWiki Dbg({}): {}", in_length, input.log_text.chars().take(256).collect::<String>());
     String::from("Ok d")
 }
 
 #[post("/jsLog/Error", data = "<input>")]
 fn rocket_route_js_error(input: Json<LogData>) -> String {
-    error!("RustyWiki Err: {}", input.LogText.chars().collect::<String>());
+    error!("RustyWiki Err: {}", input.log_text.chars().collect::<String>());
     String::from("Ok")
 }
 
 #[post("/jsLog/Exception", data = "<input>")]
 fn rocket_route_js_exception(input: Json<LogData>) -> String {
-    error!("RustyWiki Exc: {}", input.LogText.chars().collect::<String>());
+    error!("RustyWiki Exc: {}", input.log_text.chars().collect::<String>());
     String::from("Ok")
 }
 
@@ -297,25 +310,25 @@ fn rocket_route_js_log(rq: &RawStr, input: String) -> String {
 
 // TODO
 #[post("/jsUser/UserModify", data = "<input>")]
-fn rocket_route_user_modify(input: Json<_UserModify>) -> String {
-    debug!("user modify {} {}", input.User, input.Password);
+fn rocket_route_user_modify(input: Json<UserModify>) -> String {
+    debug!("user modify {} {} {} {} {}", input.user, input.password, input.new_password, input.new_password_check, input.comment);
     // make sure user is authenticated
     String::from("Ok")
 }
 
 // TODO
 #[post("/jsUser/Wikisave", data = "<input>")]
-fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<_Wikisave>) -> Status {
-    debug!("wiki save {} {}", input.Lock, input.PreviousRevision);
-    if input.Revision == "" || input.PreviousRevision == "" {
+fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> Status {
+    debug!("wiki save {} {} {} {} {} {} {} {} {}", input.page, input.revision, input.previous_revision, input.create_date, input.revision_date, input.revised_by, input.comment, input.lock, input.data);
+    if input.revision == "" || input.previous_revision == "" {
         return Status::new(519, "no revision of previous revision");
     }
-    if input.Page == "" || input.Lock == "" {
+    if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock or page");
     }
     let mp = lock_data.lock().unwrap();
-    if let Some(lock_token) = mp.get(&input.Page) {
-        if lock_token != &input.Lock {
+    if let Some(lock_token) = mp.get(&input.page) {
+        if lock_token != &input.lock {
             return Status::new(520, "wrong lock");
         }
     } else {
@@ -557,7 +570,7 @@ fn create_rocket() -> rocket::Rocket {
 
 
 fn main() {
-    _testserde();
+//    _testserde();
     let _config = get_command_line();
     println!("got config={:?}", _config);
     create_rocket().launch();
@@ -575,24 +588,24 @@ fn main() {
 fn _testserde() {
     println!("testserde");
     let u1 = UserStruct {
-        User : "u1".to_string(),
-        Password : "u1p".to_string(), 
-        Salt : "u1s".to_string(), 
-        Comment : "u1c".to_string() 
+        user : "u1".to_string(),
+        password : "u1p".to_string(), 
+        salt : "u1s".to_string(), 
+        comment : "u1c".to_string() 
     };
     let u2 = UserStruct {
-        User : "u2".to_string(),
-        Password : "u2p".to_string(), 
-        Salt : "u2s".to_string(), 
-        Comment : "u2c".to_string() 
+        user : "u2".to_string(),
+        password : "u2p".to_string(), 
+        salt : "u2s".to_string(), 
+        comment : "u2c".to_string() 
     };
     println!("u1={:?}", u1);
     let mut v1 = Vec::new();
-    let mut al = AuthlistStruct { Userlist: Vec::new() };
+    let mut al = AuthlistStruct { user_list: Vec::new() };
     let serialized = serde_json::to_string(&u1).unwrap();
     println!("serialized = {}", serialized);
-    al.Userlist.push(u1.clone());
-    al.Userlist.push(u2.clone());
+    al.user_list.push(u1.clone());
+    al.user_list.push(u2.clone());
     v1.push(u1.clone());
     v1.push(u2.clone());
     let s2 = serde_json::to_string(&al).unwrap();
@@ -613,7 +626,7 @@ fn _testserde() {
     let mut testa1 = Vec::new();
     testa1.push(u1.clone());
     testa1.push(u2.clone());
-    let wr = authstruct::Wrapper { Userlist: testa1};
+    let wr = authstruct::Wrapper { user_list: testa1};
     println!("wrapper={:?}", wr);
     let strwr = serde_json::to_string(&wr).unwrap();
     println!("stwrapper={:?}", strwr);
@@ -625,14 +638,12 @@ fn _testserde() {
 fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
     let v: Vec<&str> = in_str.split(DELIMETER).collect();
     match v.len() {
-//        0 => Ok( ("", "") ),
-//        1 => Ok( ("", v[0]) ),
         2 => Ok( (v[0], v[1]) ),
         _ => Err("Bad versioned string")
     }
 }
 
-fn join_version(ver_str : &str, data_str : &str) -> String {
+fn _join_version(ver_str : &str, data_str : &str) -> String {
     let mut res = String::with_capacity(ver_str.len()+data_str.len()+11);
     res.push_str(ver_str);
     res.push_str("\n");
