@@ -513,8 +513,8 @@ fn login_page() -> Option<File> {
 }
 
 #[post("/login", data = "<login>")]
-fn login(mut cookies: Cookies<'_>, login: Form<Login>) -> Result<Redirect, ()> {
-    if let Some(_) = auth::login_handle(&login.username, &login.password, &mut cookies) {
+fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<AuthStruct>) -> Result<Redirect, ()> {
+    if let Some(_) = auth::login_handle(&login.username, &login.password, &mut cookies, &umap) {
         error!("handled login");
         Ok(Redirect::to(uri!(site_top: "index.html")))
     } else {
@@ -534,8 +534,10 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
 fn create_rocket() -> rocket::Rocket {
     let auth = match authstruct::load_auth() {
         Ok(a) => a,
-        _ => authstruct::gen_auth()
+        _ => panic!("failed load uinfo")
+//        _ => authstruct::gen_auth()
     };
+    println!("auth={:?}", auth);
     let delay_map = DelayMap ( Arc::new(Mutex::new(HashMap::new())) );
     let lock_map = PageMap ( Arc::new(Mutex::new(HashMap::new())) );
     rocket::ignite()
@@ -555,6 +557,7 @@ fn create_rocket() -> rocket::Rocket {
 
 
 fn main() {
+    _testserde();
     let _config = get_command_line();
     println!("got config={:?}", _config);
     create_rocket().launch();
@@ -584,20 +587,38 @@ fn _testserde() {
         Comment : "u2c".to_string() 
     };
     println!("u1={:?}", u1);
+    let mut v1 = Vec::new();
     let mut al = AuthlistStruct { Userlist: Vec::new() };
     let serialized = serde_json::to_string(&u1).unwrap();
     println!("serialized = {}", serialized);
     al.Userlist.push(u1.clone());
     al.Userlist.push(u2.clone());
+    v1.push(u1.clone());
+    v1.push(u2.clone());
     let s2 = serde_json::to_string(&al).unwrap();
+    let v2s = serde_json::to_string(&v1).unwrap();
     let al2 : AuthlistStruct = serde_json::from_str(&s2).unwrap();
+    println!("v1 = {:?}", v1);
+    println!("v1s = {:?}", v2s);
     println!("s2 = {}", s2);
     println!("al2 = {:?}", al2);
+    /*
     let altest = authstruct::load_auth().unwrap();
     altest.lock().unwrap().user_map.insert(u1.User.clone(), u1.clone());
     altest.lock().unwrap().user_map.insert(u2.User.clone(), u2.clone());
     let s3 = serde_json::to_string(&al).unwrap();
     println!("s3 = {:?}", &s3);
+    */
+
+    let mut testa1 = Vec::new();
+    testa1.push(u1.clone());
+    testa1.push(u2.clone());
+    let wr = authstruct::Wrapper { Userlist: testa1};
+    println!("wrapper={:?}", wr);
+    let strwr = serde_json::to_string(&wr).unwrap();
+    println!("stwrapper={:?}", strwr);
+    let recom: authstruct::Wrapper= serde_json::from_str(&strwr).unwrap();
+    println!("recom={:?}", recom);
 }
 
 

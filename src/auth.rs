@@ -70,7 +70,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
         error!("from user: hmlen={}", users_info.user_map.len());
         let res = request.cookies().get_private("wiki_auth")
         .and_then(|cookie| {
-            error!("got cooke val={:?}", cookie.value());
+            error!("got cookie val={:?}", cookie.value());
             User::from_str(cookie.value()).ok()
         });
         error!("fr1: {:?}", res);
@@ -81,7 +81,17 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     }
 }
 
-pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>) -> Option<User> {
+pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &AuthStruct) -> Option<User> {
+    let thing = &umap.lock().unwrap().user_map;
+    let entry = thing.get(uname)?;
+    if entry.Password != pwd { return None };
+    let u_tok = User{auth: AuthState::AuthAdmin, name: uname.to_string()};
+    cookies.add_private(Cookie::new("wiki_auth", u_tok.to_string()));
+    Some(u_tok)
+        /*
+    error!("entry ={:?}", entry);
+    println!("umap={:?}",  thing.len());
+    error!("umap={:?}",  thing.len());
     if uname == "root" && pwd == "adm" {
         let u_tok = User{auth: AuthState::AuthAdmin, name: uname.to_string()};
 //        error!("lh a: {:?}", u_tok);
@@ -96,4 +106,5 @@ pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>) -> Option
 //        error!("lh f: u={:?}, p={:?}", uname, pwd);
         None
     }
+    */
 }
