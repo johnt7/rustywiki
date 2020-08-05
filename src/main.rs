@@ -20,7 +20,7 @@ use rocket::{
     http::{ContentType, Cookie, Cookies, RawStr, Status, Header},
     request::Form,
     Response,
-    response::{Redirect, Responder},
+    response::Redirect, 
     State
 };
 
@@ -146,7 +146,7 @@ struct LogData {
 
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
-struct UserModify {
+struct _UserModify {
  User: String,
  Password: String,
  NewPassword: String,
@@ -156,7 +156,7 @@ struct UserModify {
 
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
-struct Wikisave {
+struct _Wikisave {
  Page : String,
  Revision : String,
  PreviousRevision : String,
@@ -183,7 +183,7 @@ struct Login {
 }
 #[derive(FromForm)]
 #[allow(non_snake_case)]
-struct Upload {
+struct _Upload {
     uploadfile : String,
     token : String,
     #[allow(non_snake_case)]
@@ -297,7 +297,7 @@ fn rocket_route_js_log(rq: &RawStr, input: String) -> String {
 
 // TODO
 #[post("/jsUser/UserModify", data = "<input>")]
-fn rocket_route_user_modify(input: Json<UserModify>) -> String {
+fn rocket_route_user_modify(input: Json<_UserModify>) -> String {
     debug!("user modify {} {}", input.User, input.Password);
     // make sure user is authenticated
     String::from("Ok")
@@ -305,7 +305,7 @@ fn rocket_route_user_modify(input: Json<UserModify>) -> String {
 
 // TODO
 #[post("/jsUser/Wikisave", data = "<input>")]
-fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> Status {
+fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<_Wikisave>) -> Status {
     debug!("wiki save {} {}", input.Lock, input.PreviousRevision);
     if input.Revision == "" || input.PreviousRevision == "" {
         return Status::new(519, "no revision of previous revision");

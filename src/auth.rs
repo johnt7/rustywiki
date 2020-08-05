@@ -2,9 +2,8 @@ use std::{fmt, str::FromStr};
 use rocket::{
     http::{Cookies, Cookie},
     Outcome,
-    request::{self, FromRequest, Request},
-    State
- };
+    request::{self, FromRequest, Request}
+};
 use super::authstruct::AuthStruct;
 
 #[derive(Debug)]
