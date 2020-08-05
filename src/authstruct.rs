@@ -17,25 +17,13 @@ impl Deref for AuthStruct {
         &self.0
     }
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct AuthStructInternal {
     pub user_map : HashMap<String, UserStruct>,
     pub header : PageRevisionStruct
 }
-/*
-impl AuthStructInternal {
-    fn save_to_string(&self) -> String {
-        let ul : 5;
-        let mut res_str = String::new();
-        hdr = serde_json::to_string(self.Header).unwrap();
-        res_str.append(self.UserMap);
-        res_str.append(&DELIM)
-        res_str
-    }
-}
-*/
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Wrapper {
@@ -70,18 +58,14 @@ pub struct PageRevisionStruct {
 }
 
 fn load_parts<P: AsRef<Path>>(path: P) -> Result<(String, String), Box<dyn error::Error>> {
-    println!("load parts 1");
     let fs = fs::read_to_string(path)?;
-    println!("load parts 2 {}", fs.len());
     let res = super::split_version(&fs)?;
-    println!("load parts 3 {:?}", res);
     Ok((res.1.to_string(), res.0.to_string()))
 }
 
-pub fn adj_list(instr: &str) -> String {
+fn adj_list(instr: &str) -> String {
     let si = instr.find('{').unwrap_or(0);
     let fi = instr.rfind('}').unwrap_or(instr.len());
-    println!("al({},{})={}", si, fi, instr[si+1..fi].to_string());
     instr[si+1..fi].to_string()
 }
 
