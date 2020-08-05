@@ -50,14 +50,10 @@ impl fmt::Display for User {
 impl FromStr for User {
     type Err = ();
     fn from_str(input: &str) -> Result<User, Self::Err> {
-//        error!("fs1: {:?}", input);
         let mut in_str = input.split(":");
-//        error!("fs2: {:?}", in_str);
 
         let name = in_str.next().ok_or(())?;
-//        error!("fs3: {:?}", name);
         let auth_st = in_str.next().ok_or(())?;
-//        error!("fs4: {:?}", auth_st);
         Ok(User{auth: AuthState::from_str(auth_st)?, name: name.to_string()})
     }
 }
@@ -66,14 +62,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = ();
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
-        let users_info = request.guard::<State<AuthStruct>>().unwrap().inner().lock().unwrap();
-        error!("from user: hmlen={}", users_info.user_map.len());
         let res = request.cookies().get_private("wiki_auth")
         .and_then(|cookie| {
-            error!("got cookie val={:?}", cookie.value());
             User::from_str(cookie.value()).ok()
         });
-        error!("fr1: {:?}", res);
         match res {
             Some(user) => Outcome::Success(user),
             None => Outcome::Forward(())
@@ -83,28 +75,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 
 pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &AuthStruct) -> Option<User> {
     let thing = &umap.lock().unwrap().user_map;
+    // TODO handle no auth case
     let entry = thing.get(uname)?;
     if entry.Password != pwd { return None };
-    let u_tok = User{auth: AuthState::AuthAdmin, name: uname.to_string()};
+    let u_tok = User{auth: AuthState::AuthAdmin, name: uname.to_string()}; // TODO get auth from list of admin
     cookies.add_private(Cookie::new("wiki_auth", u_tok.to_string()));
     Some(u_tok)
-        /*
-    error!("entry ={:?}", entry);
-    println!("umap={:?}",  thing.len());
-    error!("umap={:?}",  thing.len());
-    if uname == "root" && pwd == "adm" {
-        let u_tok = User{auth: AuthState::AuthAdmin, name: uname.to_string()};
-//        error!("lh a: {:?}", u_tok);
-        cookies.add_private(Cookie::new("wiki_auth", u_tok.to_string()));
-        Some(u_tok)
-    } else if uname == "user" && pwd == "norm" {
-        let u_tok = User{auth: AuthState::AuthUser, name: uname.to_string()};
-//        error!("lh s: {:?}", u_tok);
-        cookies.add_private(Cookie::new("wiki_auth", u_tok.to_string()));
-        Some(u_tok)
-    } else {
-//        error!("lh f: u={:?}, p={:?}", uname, pwd);
-        None
-    }
-    */
 }
