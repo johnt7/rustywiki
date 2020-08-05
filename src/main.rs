@@ -527,6 +527,7 @@ fn login_page() -> Option<File> {
 
 #[post("/login", data = "<login>")]
 fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<AuthStruct>) -> Result<Redirect, ()> {
+
     if let Some(_) = auth::login_handle(&login.username, &login.password, &mut cookies, &umap) {
         error!("handled login");
         Ok(Redirect::to(uri!(site_top: "index.html")))

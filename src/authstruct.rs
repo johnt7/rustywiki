@@ -6,7 +6,6 @@ use std::{
     path::Path,
     sync::{Arc, Mutex}
 };
- 
 
 #[derive(Debug)]
 pub struct AuthStruct (Arc<Mutex<AuthStructInternal>>);
@@ -19,7 +18,6 @@ impl Deref for AuthStruct {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
 pub struct AuthStructInternal {
     pub user_map : HashMap<String, UserStruct>,
     pub header : PageRevisionStruct
@@ -41,25 +39,27 @@ pub struct UserStruct {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "PascalCase")]
 pub struct PageRevisionStruct {
-	pub Page : String,
-	pub Revision : String,
-	pub PreviousRevision : String,
-	pub CreateDate : String,
-	pub RevisionDate : String,
-	pub RevisedBy : String,
-	pub Comment : String,
-	pub Lock : String,
-	pub Data : String
+	pub page : String,
+	pub revision : String,
+	pub previous_revision : String,
+	pub create_date : String,
+	pub revision_date : String,
+	pub revised_by : String,
+	pub comment : String,
+	pub lock : String,
+	pub data : String
 }
 
+/// Tries to load a tinywiki file, splitting it into two string, the content and the version info
 fn load_parts<P: AsRef<Path>>(path: P) -> Result<(String, String), Box<dyn error::Error>> {
     let fs = fs::read_to_string(path)?;
     let res = super::split_version(&fs)?;
     Ok((res.1.to_string(), res.0.to_string()))
 }
 
+/// Tries to load the config file for a tiny wiki
 pub fn load_auth() -> Result<AuthStruct, Box<dyn error::Error>> {
     if let Ok((um, hdr)) = load_parts("site/wiki/_user/current") {
         let umwin: Wrapper = serde_json::from_str(&um)?;
@@ -70,19 +70,20 @@ pub fn load_auth() -> Result<AuthStruct, Box<dyn error::Error>> {
     Err("Failed to load".into())
 }
 
+/// Generates an AuthStruct - debug only
 pub fn gen_auth() -> AuthStruct {
     AuthStruct(Arc::new(Mutex::new(AuthStructInternal{     
         user_map : HashMap::new(),
         header : PageRevisionStruct {
-            Page : "_user".to_string(),
-            Revision : "000000000".to_string(),
-            PreviousRevision : "000000000".to_string(),
-            CreateDate : String::new(),
-            RevisionDate : String::new(),
-            RevisedBy : String::new(),
-            Comment : String::new(),
-            Lock : String::new(),
-            Data : String::new()
+            page : "_user".to_string(),
+            revision : "000000000".to_string(),
+            previous_revision : "000000000".to_string(),
+            create_date : String::new(),
+            revision_date : String::new(),
+            revised_by : String::new(),
+            comment : String::new(),
+            lock : String::new(),
+            data : String::new()
         }
     })))
 }

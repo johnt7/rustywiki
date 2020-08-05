@@ -12,7 +12,6 @@ pub enum AuthState {
     AuthUser,
     AuthAdmin
 }
-
 impl FromStr for AuthState {
     type Err = ();
     fn from_str(input: &str) -> Result<AuthState, Self::Err> {
@@ -39,13 +38,11 @@ pub struct User {
     pub auth: AuthState,
     pub name: String
 }
-
 impl fmt::Display for User {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.name, self.auth)
     }
 }
-
 impl FromStr for User {
     type Err = ();
     fn from_str(input: &str) -> Result<User, Self::Err> {
@@ -56,7 +53,6 @@ impl FromStr for User {
         Ok(User{auth: AuthState::from_str(auth_st)?, name: name.to_string()})
     }
 }
-
 impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = ();
 
@@ -72,6 +68,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     }
 }
 
+// TODO - not happy with the encapsulation,
 pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &AuthStruct) -> Option<User> {
     let thing = &umap.lock().unwrap().user_map;
     // TODO handle no auth case
