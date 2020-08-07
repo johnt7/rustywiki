@@ -50,9 +50,9 @@ pub struct UserStruct {
 
 /// Tries to load the config file for a tiny wiki
 pub fn load_auth() -> Result<AuthStruct, Box<dyn error::Error>> {
-    if let Ok((um, hdr)) = wikifile::load_parts("site/wiki/_user/current") {
-        let umwin: Wrapper = serde_json::from_str(&um)?;
         // TODO, examine to see about cleaning this code up a bit
+        if let Ok((um, hdr)) = wikifile::load_parts("site/wiki/_user/current") {
+        let umwin: Wrapper = serde_json::from_str(&um)?;
         let umap = umwin.user_list.iter().map(|us| (us.user.clone(), us.clone())).collect();
         return Ok(AuthStruct(Arc::new(Mutex::new(AuthStructInternal{user_map: umap, header: hdr}))))
     }

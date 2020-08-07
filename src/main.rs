@@ -34,6 +34,7 @@ use rocket_contrib::{
 #[cfg(test)] mod tests;
 mod authstruct;
 mod basic;
+mod config;
 mod user;
 mod wikifile;
 
@@ -42,104 +43,12 @@ use user::User;
 
 
 
-
 // Constants
 const DATE_FORMAT : &str = "%Y/%m/%d %H:%M:%S%.3f";
-const DELIMETER : &str = "<!--REVISION HEADER DEMARCATION>";
+
+
 
 // types
-
-/// Command line configuration information
-#[derive(Debug)]
-pub struct ConfigInfo {
-    log_file_name : String,
-    site : String,
-    console_log : bool,
-    cert : String,
-    key : String,
-    port : u16
-}
-
-/*
-
-#[derive(Responder)]
-enum StringResponder {
-    #[response(status=200, content_type="text/html")]
-    Content(String),
-    #[response(status=500)]
-    Nothing(String)
-}
-*/
-
-/*
-#[derive(FromForm)]
-struct Task {
-   description: String,
-   completed: bool
-}
-*/
-
-/*
-TODO - return all the strange 500 errors from the GO
-pub struct WikiResponse {
-    value: u16,
-    str: String
-}
-
-#[catch(404)]
-fn not_found(req: &rocket::Request) -> content::Html<String> {
-    content::Html(format!("<p>Sorry, but '{}' is not a valid path!</p>
-            <p>Try visiting /hello/&lt;name&gt;/&lt;age&gt; instead.</p>",
-            req.uri()))
-}
-
-impl Responder<'static> for WikiResponse {
-    fn respond_to(self, _: &Request) ->  Response {
-    let mut response = Response::new();
-    response.set_status(Status::new(self.value, self.str.to_owned()));
-    return response
-   }
-}
-*/
-const SDF1 : &str = r#"{
-	"Page": "start",
-	"Revision": "000000000",
-	"PreviousRevision": "000000000",
-	"CreateDate": "2018/05/05 19:53:05.248-07:00",
-	"RevisionDate": "2018/05/05 19:53:05.248-07:00",
-	"RevisedBy": "user",
-	"Comment": ""
-}
-<!--REVISION HEADER DEMARCATION>
-"#;
-
-const SDF2 : &str = r#"{
-	"Page"sdf2: "_user",
-	"Revision": "000000001",
-	"PreviousRevision": "000000000",
-	"CreateDate": "2018/05/12 19:53:05.248-07:00",
-	"RevisionDate": "2018/05/12 19:53:05.248-07:00",
-	"RevisedBy": "user",
-	"Comment": "Initial save"
-}
-<!--REVISION HEADER DEMARCATION>
-{
-	"user_list": [
-		{
-			"User": "user",
-			"Password": "pwd",
-			"Salt": "",
-			"Comment": ""
-		},
-		{
-			"User": "root",
-			"Password": "pwd",
-			"Salt": "",
-			"Comment": ""
-		}
-	]
-}"#;
-
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -157,22 +66,7 @@ struct UserModify {
     comment: String
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct Wikisave {
-//    #[serde(rename = "Page")]
-    page : String,
-    revision : String,
-    previous_revision : String,
-    create_date : String,
-    revision_date : String,
-    revised_by : String,
-    comment : String,
-    lock : String,
-    data : String
-}
-
-// also acts as unlock
+// also used in unlock
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 struct Wikilock {
@@ -185,6 +79,7 @@ struct Login {
     username: String,
     password: String
 }
+
 #[derive(Serialize, Deserialize,FromForm)]
 struct _Upload {
     uploadfile : String,
@@ -199,28 +94,6 @@ struct UserDelete {
  user : String
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "PascalCase")]
-struct ConfigurationStruct {
-	case_sensitive : bool, // This should be set if the file system and thus wiki page names are case sensitive. If in doubt set to false.
-	authenticationequired_for_read : bool, // If true unautheticated users can read wiki pages
-	authentication_required_for_logging : bool, // Allows unauthenticated users to log debug. This is a potential denial of service vector.
-	allow_media_overwrite : bool, // Set to true to allow the overwriting media files on uploads.
-	start_page : String, // the page loaded by default as the starting wiki page.
-	number_of_concurrent_locks : u32, // The number of pages which can be concurrently locked for editing.
-	max_number_of_users : u32, // The maximum number of users
-	max_velocity : u32, // Minimum time in nanoseconds between authenticated requests from an IP address
-	unauth_max_velocity : u32, // Minimum time in nanoseconds between unauthenticated requests from an IP address
-	admin_users : Vec<String>, // An array of admin user names
-	admin_pages : Vec<String> // An array of pages and rest calls only available to admim users
-}
-/*
-#[derive(Serialize, Deserialize, Debug)]
-struct AuthlistStruct {
-    user_list : Vec<UserStruct>
-}
-*/
-
 struct RequestDelayStruct {
     _delay : Duration,
     _last : Instant
@@ -234,6 +107,7 @@ impl Deref for DelayMap {
         &self.0
     }
 }
+
 struct PageMap ( Arc<Mutex<HashMap<String, String>>> );
 impl Deref for PageMap {
     type Target = Mutex<HashMap<String, String>>;
@@ -243,28 +117,6 @@ impl Deref for PageMap {
     }
 }
 
-/// Loads information from the command line
-fn get_command_line() -> ConfigInfo {
-    let matches = clap_app!(rtinywiki =>
-        (version: "0.0.0")
-        (author: "Johnt <johnt7@gmail.com>")
-        (about: "Rust Tiny Wiki")
-        (@arg logfile: -l --log +takes_value "Log file name")
-        (@arg cert: -c --cert +takes_value "Server certificate file")
-        (@arg site: -s --site +takes_value "Location of site directory")
-        (@arg key: -k --key +takes_value "Server key file")
-        (@arg port: -p --port +takes_value "Port number")
-        (@arg consoleLog: -d --dump "Dump log to console?")
-    ).get_matches();
-    ConfigInfo {
-        log_file_name : matches.value_of("logfile").unwrap_or("site/wikiserver.log").to_string(),
-        site : matches.value_of("site").unwrap_or("site").to_string(),
-        cert : matches.value_of("cert").unwrap_or("server.cert").to_string(),
-        key : matches.value_of("key").unwrap_or("server.key").to_string(),
-        console_log : !matches.is_present("consoleLog"),
-        port : matches.value_of("port").unwrap_or("9990").parse().unwrap_or(9990)
-    }
-}
 
 #[post("/jsLog/DebugNoTrunc", data = "<input>", rank=1)]
 fn rocket_route_js_debug_no_trunc(input: Json<LogData>) -> String {
@@ -307,7 +159,7 @@ fn rocket_route_user_modify(input: Json<UserModify>) -> String {
 
 // TODO
 #[post("/jsUser/Wikisave", data = "<input>")]
-fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<Wikisave>) -> Status {
+fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
     debug!("wiki save {} {} {} {} {} {} {} {} {}", input.page, input.revision, input.previous_revision, input.create_date, input.revision_date, input.revised_by, input.comment, input.lock, input.data);
     if input.revision == "" || input.previous_revision == "" {
         return Status::new(519, "no revision of previous revision");
@@ -475,17 +327,18 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
  }
 
 
-
 fn create_rocket() -> rocket::Rocket {
-    let auth = match authstruct::load_auth() {
-        Ok(a) => a,
-        _ => panic!("failed load uinfo")
-    };
-    println!("auth={:?}", auth);
+    let auth =  authstruct::load_auth().unwrap();
+//    println!("auth={:?}", auth);
+    let cfg = config::load_config().unwrap();
+//    println!("cfg={:?}", cfg);
+
     let delay_map = DelayMap ( Arc::new(Mutex::new(HashMap::new())) );
     let lock_map = PageMap ( Arc::new(Mutex::new(HashMap::new())) );
+
     rocket::ignite()
     .manage(auth)
+    .manage(cfg)
     .manage(delay_map)
     .manage(lock_map)
     .mount("/css", StaticFiles::from("site/css"))  // use the site value from config
@@ -502,83 +355,45 @@ fn create_rocket() -> rocket::Rocket {
 
 fn main() {
    let _config = get_command_line();
-    println!("got config={:?}", _config);
+//    println!("got config={:?}", _config);
     create_rocket().launch();
 }
 
 
-fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
-    let v: Vec<&str> = in_str.split(DELIMETER).collect();
-    match v.len() {
-        2 => Ok( (v[0], v[1]) ),
-        _ => Err("Bad versioned string")
+
+
+
+
+/// Command line configuration information
+#[derive(Debug)]
+pub struct ConfigInfo {
+    pub log_file_name : String,
+    pub site : String,
+    pub console_log : bool,
+    pub cert : String,
+    pub key : String,
+    pub port : u16
+}
+
+/// Loads information from the command line
+pub fn get_command_line() -> ConfigInfo {
+    let matches = clap_app!(rtinywiki =>
+        (version: "0.0.0")
+        (author: "Johnt <johnt7@gmail.com>")
+        (about: "Rust Tiny Wiki")
+        (@arg logfile: -l --log +takes_value "Log file name")
+        (@arg cert: -c --cert +takes_value "Server certificate file")
+        (@arg site: -s --site +takes_value "Location of site directory")
+        (@arg key: -k --key +takes_value "Server key file")
+        (@arg port: -p --port +takes_value "Port number")
+        (@arg consoleLog: -d --dump "Dump log to console?")
+    ).get_matches();
+    ConfigInfo {
+        log_file_name : matches.value_of("logfile").unwrap_or("site/wikiserver.log").to_string(),
+        site : matches.value_of("site").unwrap_or("site").to_string(),
+        cert : matches.value_of("cert").unwrap_or("server.cert").to_string(),
+        key : matches.value_of("key").unwrap_or("server.key").to_string(),
+        console_log : !matches.is_present("consoleLog"),
+        port : matches.value_of("port").unwrap_or("9990").parse().unwrap_or(9990)
     }
-}
-
-
-
-//////////////////////////////////////////////////////
-/// Unused
-/// 
-
-/*
-fn _testserde() {
-    println!("testserde");
-    let u1 = UserStruct {
-        user : "u1".to_string(),
-        password : "u1p".to_string(), 
-        salt : "u1s".to_string(), 
-        comment : "u1c".to_string() 
-    };
-    let u2 = UserStruct {
-        user : "u2".to_string(),
-        password : "u2p".to_string(), 
-        salt : "u2s".to_string(), 
-        comment : "u2c".to_string() 
-    };
-    println!("u1={:?}", u1);
-    let mut v1 = Vec::new();
-    let mut al = AuthlistStruct { user_list: Vec::new() };
-    let serialized = serde_json::to_string(&u1).unwrap();
-    println!("serialized = {}", serialized);
-    al.user_list.push(u1.clone());
-    al.user_list.push(u2.clone());
-    v1.push(u1.clone());
-    v1.push(u2.clone());
-    let s2 = serde_json::to_string(&al).unwrap();
-    let v2s = serde_json::to_string(&v1).unwrap();
-    let al2 : AuthlistStruct = serde_json::from_str(&s2).unwrap();
-    println!("v1 = {:?}", v1);
-    println!("v1s = {:?}", v2s);
-    println!("s2 = {}", s2);
-    println!("al2 = {:?}", al2);
-    /*
-    let altest = authstruct::load_auth().unwrap();
-    altest.lock().unwrap().user_map.insert(u1.User.clone(), u1.clone());
-    altest.lock().unwrap().user_map.insert(u2.User.clone(), u2.clone());
-    let s3 = serde_json::to_string(&al).unwrap();
-    println!("s3 = {:?}", &s3);
-    */
-
-    let mut testa1 = Vec::new();
-    testa1.push(u1.clone());
-    testa1.push(u2.clone());
-    let wr = authstruct::Wrapper { user_list: testa1};
-    println!("wrapper={:?}", wr);
-    let strwr = serde_json::to_string(&wr).unwrap();
-    println!("stwrapper={:?}", strwr);
-    let recom: authstruct::Wrapper= serde_json::from_str(&strwr).unwrap();
-    println!("recom={:?}", recom);
-}
-*/
-
-
-fn _join_version(ver_str : &str, data_str : &str) -> String {
-    let mut res = String::with_capacity(ver_str.len()+data_str.len()+11);
-    res.push_str(ver_str);
-    res.push_str("\n");
-    res.push_str(DELIMETER);
-    res.push_str("\n");
-    res.push_str(data_str);
-    res
 }
