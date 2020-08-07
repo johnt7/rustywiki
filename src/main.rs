@@ -32,11 +32,14 @@ use rocket_contrib::{
 
 // Modules
 #[cfg(test)] mod tests;
-mod auth;
-mod basic;
 mod authstruct;
-use auth::{User};
-use authstruct::{AuthStruct, UserStruct};
+mod basic;
+mod user;
+mod wikifile;
+
+use authstruct::AuthStruct;
+use user::User;
+
 
 
 
@@ -211,11 +214,12 @@ struct ConfigurationStruct {
 	admin_users : Vec<String>, // An array of admin user names
 	admin_pages : Vec<String> // An array of pages and rest calls only available to admim users
 }
-
+/*
 #[derive(Serialize, Deserialize, Debug)]
 struct AuthlistStruct {
     user_list : Vec<UserStruct>
 }
+*/
 
 struct RequestDelayStruct {
     _delay : Duration,
@@ -455,7 +459,7 @@ fn login_page() -> Option<File> {
 #[post("/login", data = "<login>")]
 fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<AuthStruct>) -> Result<Redirect, ()> {
 
-    if let Some(_) = auth::login_handle(&login.username, &login.password, &mut cookies, &umap) {
+    if let Some(_) = authstruct::login_handle(&login.username, &login.password, &mut cookies, &umap) {
         error!("handled login");
         Ok(Redirect::to(uri!(site_top: "index.html")))
     } else {
@@ -517,7 +521,7 @@ fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
 /// Unused
 /// 
 
-
+/*
 fn _testserde() {
     println!("testserde");
     let u1 = UserStruct {
@@ -566,7 +570,7 @@ fn _testserde() {
     let recom: authstruct::Wrapper= serde_json::from_str(&strwr).unwrap();
     println!("recom={:?}", recom);
 }
-
+*/
 
 
 fn _join_version(ver_str : &str, data_str : &str) -> String {

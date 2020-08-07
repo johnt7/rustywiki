@@ -1,10 +1,8 @@
 use std::{fmt, str::FromStr};
 use rocket::{
-    http::{Cookies, Cookie},
     Outcome,
     request::{self, FromRequest, Request}
 };
-use super::authstruct::AuthStruct;
 
 #[derive(Debug)]
 pub enum AuthState {
@@ -66,15 +64,4 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
             None => Outcome::Forward(())
         }
     }
-}
-
-// TODO - not happy with the encapsulation,
-pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &AuthStruct) -> Option<User> {
-    let thing = &umap.lock().unwrap().user_map;
-    // TODO handle no auth case
-    let entry = thing.get(uname)?;
-    if entry.password != pwd { return None };
-    let u_tok = User{auth: AuthState::AuthAdmin, name: uname.to_string()}; // TODO get auth from list of admin
-    cookies.add_private(Cookie::new("wiki_auth", u_tok.to_string()));
-    Some(u_tok)
 }
