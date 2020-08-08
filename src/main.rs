@@ -5,6 +5,7 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 
+// TODO - look at what happens with /wiki/foo and /page/foo/version
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -160,14 +161,15 @@ fn rocket_route_user_modify(input: Json<UserModify>) -> String {
 // TODO
 #[post("/jsUser/Wikisave", data = "<input>")]
 fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
-    debug!("wiki save {} {} {} {} {} {} {} {} {}", input.page, input.revision, input.previous_revision, input.create_date, input.revision_date, input.revised_by, input.comment, input.lock, input.data);
+    error!("wiki save {} {} {} {} {} {} {} {} {}", input.page, input.revision, input.previous_revision, input.create_date, input.revision_date, input.revised_by, input.comment, input.lock, input.data);
     if input.revision == "" || input.previous_revision == "" {
-        return Status::new(519, "no revision of previous revision");
+        return Status::new(519, "no revision or previous revision");
     }
     if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock or page");
     }
     let mp = lock_data.lock().unwrap();
+    error!("page data ok");
     if let Some(lock_token) = mp.get(&input.page) {
         if lock_token != &input.lock {
             return Status::new(520, "wrong lock");
@@ -175,17 +177,14 @@ fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<wikifile::Page
     } else {
         return Status::new(521, "wrong lock");
     }
-    // TODO
-    // make sure directory /wiki/input.page exists
-    // open /wiki/input.page/input.revision
-    // write data to file
-    // close file
-    // write to /wiki/input.page/current
-    // close file
-    Status::Ok
+    error!("page lock ok");
+//    let data = input.data.split_off(input.data.len()-1);
+    match wikifile::write_parts(&input, &input.data) {
+        Ok(_) => Status::Ok,
+        _ => Status::new(522, "failed to write")
+    }
 }
 
-// TODO
 #[post("/jsUser/Wikilock", data = "<input>")]
 fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
     if input.page == "" || input.lock == "" {
@@ -201,13 +200,13 @@ fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> 
     Status::Ok
 }
 
-// TODO
 #[post("/jsUser/Wikiunlock", data = "<input>")]
 fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
      if input.page == "" {
         return None;
     }
     let mut mp = lock_data.lock().unwrap();
+    // find if there is a lock and if so make sure the lock keys match
     if let Some(ll) = mp.get(&input.page) {
         if ll != &input.lock {
             return None;
@@ -250,6 +249,7 @@ fn rocket_route_media_index(_user: User, ) -> String {
     String::from("Ok")
 }
 
+// TODO - what is this, why different from page?
 #[get("/wiki/<page_name>/<version>")]
 fn rocket_route_wiki(_user: User, page_name : String, version: Option<String>) -> io::Result<String> {
     let version = version.unwrap_or("current".to_string());
@@ -329,9 +329,7 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
 
 fn create_rocket() -> rocket::Rocket {
     let auth =  authstruct::load_auth().unwrap();
-//    println!("auth={:?}", auth);
     let cfg = config::load_config().unwrap();
-//    println!("cfg={:?}", cfg);
 
     let delay_map = DelayMap ( Arc::new(Mutex::new(HashMap::new())) );
     let lock_map = PageMap ( Arc::new(Mutex::new(HashMap::new())) );
@@ -362,7 +360,7 @@ fn main() {
 
 
 
-
+// command line parsing.  Not sure how to move to other module with macros
 
 /// Command line configuration information
 #[derive(Debug)]
@@ -397,3 +395,12 @@ pub fn get_command_line() -> ConfigInfo {
         port : matches.value_of("port").unwrap_or("9990").parse().unwrap_or(9990)
     }
 }
+
+
+
+
+//
+// TODO list
+// index.html
+//    update revision date
+// wikisave - update user
