@@ -40,7 +40,9 @@ mod user;
 mod wikifile;
 
 use authstruct::AuthStruct;
-use config::ConfigContainer;
+use config::ConfigurationStruct;
+use wikifile::{WikiContainer, WikiStruct};
+
 use user::{LogUser, User};
 
 
@@ -246,14 +248,14 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
 
 // TODO
 #[get("/jsAdmin/MasterReset")]
-fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<AuthStruct>, cfg: State<ConfigContainer>) -> String {
+fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<AuthStruct>, cfg: State<WikiContainer<WikiStruct<ConfigurationStruct>>>) -> String {
     error!("master reset 1");
     *delay_map.write().unwrap() = HashMap::new();
     error!("master reset 2");
     *page_locks.write().unwrap() = HashMap::new();
     error!("master reset 3");
     *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
-    *cfg.write().unwrap() =  authstruct::load_auth_int().unwrap();
+//    *cfg.write().unwrap() =  config::load_config_int().unwrap();
 
     String::from("Ok")
 }

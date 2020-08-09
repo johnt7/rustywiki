@@ -2,7 +2,6 @@ use std::{
     borrow::Cow,
     error,
     fs,
-    ops::Deref,
     path::Path,
     sync::RwLock
 };
@@ -90,15 +89,9 @@ fn join_version(ver_str : &str, data_str : &str) -> String {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct WikiContainer<S> {
-    pub config : S,
+    pub data : S,
     pub header : PageRevisionStruct
 }
 
-pub struct WikiStruct<S> (RwLock<S>);
-impl<S> Deref for WikiStruct<S> {
-    type Target = RwLock<S>;
+pub struct WikiStruct<S> (pub RwLock<WikiContainer<S>>);
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}

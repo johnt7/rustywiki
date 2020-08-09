@@ -1,11 +1,18 @@
-use std::{fmt, str::FromStr};
+use std::{
+    fmt,
+    str::FromStr,
+    sync::RwLock
+};
 use rocket::{
     http::Status,
     Outcome,
     request::{self, FromRequest, Request},
     State
 };
-use super::config;
+use super::{
+    config,
+    wikifile
+};
 #[derive(Debug)]
 pub enum AuthState {
     AuthNotAuth,
@@ -77,9 +84,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for LogUser {
         .and_then(|cookie| {
             User::from_str(cookie.value()).ok()
         });
-        match request.guard::<State<config::ConfigContainer>>() {
+        match request.guard::<State<wikifile::WikiStruct<config::ConfigurationStruct>>>() {
             Outcome::Success(cfg) => {
-                if !cfg.config.authentication_required_for_logging {
+                error!("log?={}", cfg.0.read().unwrap().data.authentication_required_for_logging);
+                if !cfg.0.read().unwrap().data.authentication_required_for_logging {
                     return Outcome::Success(LogUser);
                 }
             },

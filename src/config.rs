@@ -1,5 +1,6 @@
 use std::{
-    error
+    error,
+    sync::RwLock
 };
 
 use super::wikifile;
@@ -27,11 +28,14 @@ pub struct ConfigurationStruct {
 	pub admin_pages : Vec<String> // An array of pages and rest calls only available to admim users
 }
 
-
 /// Tries to load the config file for a tiny wiki
-pub fn load_config() -> Result<ConfigContainer, Box<dyn error::Error>> {
+pub fn load_config() -> Result<wikifile::WikiStruct<ConfigurationStruct>, Box<dyn error::Error>> {
+	return Ok(wikifile::WikiStruct(RwLock::new( load_config_int()? )))
+}
+
+pub fn load_config_int() -> Result<wikifile::WikiContainer<ConfigurationStruct>, Box<dyn error::Error>> {
     if let Ok((cfg, hdr)) = wikifile::load_parts("site/wiki/_config/current") {
-        return Ok(ConfigContainer{config: serde_json::from_str(&cfg)?, header: hdr});
+        return Ok(wikifile::WikiContainer{data: serde_json::from_str(&cfg)?, header: hdr});
     }
     Err("Failed to load".into())
 }
@@ -41,6 +45,7 @@ impl ConfigContainer {
 		self.config.authenticationequired_for_read
 	}
 	pub fn auth_req_log(&self) -> bool {
+		error!("auth for logging?");
 		self.config.authentication_required_for_logging
 	}
 }
