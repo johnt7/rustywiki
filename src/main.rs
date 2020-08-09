@@ -252,8 +252,8 @@ fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageM
     error!("master reset 2");
     *page_locks.write().unwrap() = HashMap::new();
     error!("master reset 3");
-    let auth =  authstruct::load_auth().unwrap();
-    let cfg = config::load_config().unwrap();
+    *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
+    *cfg.write().unwrap() =  authstruct::load_auth_int().unwrap();
 
     String::from("Ok")
 }

@@ -2,7 +2,9 @@ use std::{
     borrow::Cow,
     error,
     fs,
-    path::Path
+    ops::Deref,
+    path::Path,
+    sync::RwLock
 };
 
 const DELIMETER : &str = "<!--REVISION HEADER DEMARCATION>";
@@ -84,3 +86,19 @@ fn join_version(ver_str : &str, data_str : &str) -> String {
     res
 }
 
+
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct WikiContainer<S> {
+    pub config : S,
+    pub header : PageRevisionStruct
+}
+
+pub struct WikiStruct<S> (RwLock<S>);
+impl<S> Deref for WikiStruct<S> {
+    type Target = RwLock<S>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
