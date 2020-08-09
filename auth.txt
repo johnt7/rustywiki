@@ -1,0 +1,15 @@
+case_sensitive
+- only used in cleanPage
+- how do I get it during load etc?
+
+logging=jsLog - log use auth
+
+page=wikiPage || otherPage
+otherpage=path == "/" || path == "/index.html" || path == "/wikiserver.log" || path == "/favicon.ico" || strings.Index( path, "/css/") == 0 || strings.Index( path, "/js/") == 0 || strings.Index( path, "/media/")
+
+wikipage= !adminPage && starts with "/wiki/" || starts with "/page/"
+is_admin - ! in admin list
+
+is_admin
+
+page log

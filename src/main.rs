@@ -12,7 +12,7 @@ use std::{
     io::{self, Cursor},
     ops::Deref,
     path::*,
-    sync::{Arc, Mutex},
+    sync::{RwLock},
     time::{Duration, Instant},
 };
 
@@ -40,7 +40,8 @@ mod user;
 mod wikifile;
 
 use authstruct::AuthStruct;
-use user::User;
+use config::ConfigContainer;
+use user::{LogUser, User};
 
 
 
@@ -100,52 +101,60 @@ struct RequestDelayStruct {
     _last : Instant
 }
 
-struct DelayMap ( Arc<Mutex<HashMap<String, RequestDelayStruct>>> );
+struct DelayMap ( RwLock<HashMap<String, RequestDelayStruct>> );
 impl Deref for DelayMap {
-    type Target = Mutex<HashMap<String, RequestDelayStruct>>;
+    type Target = RwLock<HashMap<String, RequestDelayStruct>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-
-struct PageMap ( Arc<Mutex<HashMap<String, String>>> );
+impl DelayMap {
+    pub fn new() -> DelayMap {
+        DelayMap ( RwLock::new(HashMap::new()) )
+    }
+}
+struct PageMap ( RwLock<HashMap<String, String>> );
 impl Deref for PageMap {
-    type Target = Mutex<HashMap<String, String>>;
+    type Target = RwLock<HashMap<String, String>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-
+impl PageMap {
+    pub fn new() -> PageMap {
+        PageMap ( RwLock::new(HashMap::new()) )
+    }
+}
 
 #[post("/jsLog/DebugNoTrunc", data = "<input>", rank=1)]
-fn rocket_route_js_debug_no_trunc(input: Json<LogData>) -> String {
+fn rocket_route_js_debug_no_trunc(_log_user: LogUser, input: Json<LogData>) -> String {
     warn!("RustyWiki Dbg: {}", input.log_text);
     String::from("Ok t")
 }
 
 #[post("/jsLog/Debug", data = "<input>")]
-fn rocket_route_js_debug(input: Json<LogData>) -> String {
+fn rocket_route_js_debug(_log_user: LogUser, input: Json<LogData>) -> String {
     let in_length = input.log_text.len();
     warn!("RustyWiki Dbg({}): {}", in_length, input.log_text.chars().take(256).collect::<String>());
     String::from("Ok d")
 }
 
 #[post("/jsLog/Error", data = "<input>")]
-fn rocket_route_js_error(input: Json<LogData>) -> String {
+fn rocket_route_js_error(_log_user: LogUser, input: Json<LogData>) -> String {
     error!("RustyWiki Err: {}", input.log_text.chars().collect::<String>());
     String::from("Ok")
 }
 
 #[post("/jsLog/Exception", data = "<input>")]
-fn rocket_route_js_exception(input: Json<LogData>) -> String {
+fn rocket_route_js_exception(_log_user: LogUser, input: Json<LogData>) -> String {
     error!("RustyWiki Exc: {}", input.log_text.chars().collect::<String>());
     String::from("Ok")
 }
 
 #[post("/jsLog/<rq>", data = "<input>")]
-fn rocket_route_js_log(rq: &RawStr, input: String) -> String {
+fn rocket_route_js_log(_log_user: LogUser, rq: &RawStr, input: String) -> String {
     info!("RustyWiki Log failed parse: {} {}", rq.as_str(), input);
     String::from("520")
 }
@@ -168,7 +177,7 @@ fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<wikifile::Page
     if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock or page");
     }
-    let mp = lock_data.lock().unwrap();
+    let mp = lock_data.read().unwrap();
     error!("page data ok");
     if let Some(lock_token) = mp.get(&input.page) {
         if lock_token != &input.lock {
@@ -190,7 +199,7 @@ fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> 
     if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock page");
     }
-    let mut mp = lock_data.lock().unwrap();
+    let mut mp = lock_data.write().unwrap();
     if let Some(_) = mp.get(&input.page) {
         return Status::new(520, "already locked");
     }
@@ -205,7 +214,7 @@ fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -
      if input.page == "" {
         return None;
     }
-    let mut mp = lock_data.lock().unwrap();
+    let mut mp = lock_data.write().unwrap();
     // find if there is a lock and if so make sure the lock keys match
     if let Some(ll) = mp.get(&input.page) {
         if ll != &input.lock {
@@ -237,8 +246,15 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
 
 // TODO
 #[get("/jsAdmin/MasterReset")]
-fn rocket_route_master_reset() -> String {
-    debug!("master reset");
+fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<AuthStruct>, cfg: State<ConfigContainer>) -> String {
+    error!("master reset 1");
+    *delay_map.write().unwrap() = HashMap::new();
+    error!("master reset 2");
+    *page_locks.write().unwrap() = HashMap::new();
+    error!("master reset 3");
+    let auth =  authstruct::load_auth().unwrap();
+    let cfg = config::load_config().unwrap();
+
     String::from("Ok")
 }
 
@@ -331,8 +347,8 @@ fn create_rocket() -> rocket::Rocket {
     let auth =  authstruct::load_auth().unwrap();
     let cfg = config::load_config().unwrap();
 
-    let delay_map = DelayMap ( Arc::new(Mutex::new(HashMap::new())) );
-    let lock_map = PageMap ( Arc::new(Mutex::new(HashMap::new())) );
+    let delay_map = DelayMap::new();// ( RwLock::new(HashMap::new()) );
+    let lock_map = PageMap::new(); // ( RwLock::new(HashMap::new()) );
 
     rocket::ignite()
     .manage(auth)
@@ -353,14 +369,13 @@ fn create_rocket() -> rocket::Rocket {
 
 fn main() {
    let _config = get_command_line();
-//    println!("got config={:?}", _config);
     create_rocket().launch();
 }
 
 
 
 
-// command line parsing.  Not sure how to move to other module with macros
+// command line parsing.  TODO Not sure how to move to other module with macros
 
 /// Command line configuration information
 #[derive(Debug)]

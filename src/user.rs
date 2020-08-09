@@ -1,9 +1,11 @@
 use std::{fmt, str::FromStr};
 use rocket::{
+    http::Status,
     Outcome,
-    request::{self, FromRequest, Request}
+    request::{self, FromRequest, Request},
+    State
 };
-
+use super::config;
 #[derive(Debug)]
 pub enum AuthState {
     AuthNotAuth,
@@ -62,6 +64,30 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
         match res {
             Some(user) => Outcome::Success(user),
             None => Outcome::Forward(())
+        }
+    }
+}
+
+pub struct LogUser;
+impl<'a, 'r> FromRequest<'a, 'r> for LogUser {
+    type Error = ();
+
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<LogUser, Self::Error> {
+        let res = request.cookies().get_private("wiki_auth")
+        .and_then(|cookie| {
+            User::from_str(cookie.value()).ok()
+        });
+        match request.guard::<State<config::ConfigContainer>>() {
+            Outcome::Success(cfg) => {
+                if !cfg.config.authentication_required_for_logging {
+                    return Outcome::Success(LogUser);
+                }
+            },
+            _ => {}
+        };
+        match res {
+            Some(_) => Outcome::Success(LogUser),
+            None => Outcome::Failure((Status::Unauthorized, ()))
         }
     }
 }

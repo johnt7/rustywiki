@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     error,
     fs,
     path::Path
@@ -24,30 +25,45 @@ pub struct PageRevisionStruct {
     pub data : String
 }
 
+impl PageRevisionStruct {
+    fn clean(&mut self, case_sense: bool) {
+        let res = match case_sense {
+            true => Cow::from(&self.page),
+            false => Cow::from(self.page.to_lowercase())
+        };
+        let res = res.replace(".", "");
+        let res = res.replace("/", "");
+        self.page = res.replace("\\", "");
+    }
+}
 
 // TODO - centralize wiki local file path handling??
+// TODO - where do I get load
 /// Tries to load a tinywiki file, splitting it into two string, the content and the version info
 pub fn load_parts<P: AsRef<Path>>(path: P) -> Result<(String, PageRevisionStruct), Box<dyn error::Error>> {
     let fs = fs::read_to_string(path)?;
     let res = split_version(&fs)?;
-    let header: PageRevisionStruct = serde_json::from_str(res.0)?;
+    let mut header: PageRevisionStruct = serde_json::from_str(res.0)?;
+    header.clean(true);
     Ok((res.1.to_string(), header))
 }
 
+/// Takes a revision structure and data and writes them to the wiki
 pub fn write_parts(vers: &PageRevisionStruct, data: &str) -> Result<(), Box<dyn error::Error>> {
     let pbase = Path::new("site/wiki/").join(&vers.page);
 
     let vinfo = serde_json::to_string_pretty(vers)?;
     let all = join_version(&vinfo, data);
 
-    let pver = pbase.join(&vers.revision);
+//    let pver = pbase.join(&vers.revision);
     fs::write(pbase.join(&vers.revision), &all)?;
-    let cver = pbase.join("current");
+//    let cver = pbase.join("current");
     fs::write(pbase.join("current"), &all)?;
     Ok(())
     // write to /wiki/input.page/current
  }
 
+/// Takes a file in wiki format and divides it into the version information and data
 fn split_version<'a>(in_str : &'a str) -> Result<(&'a str, &'a str), &'a str> {
     let v: Vec<&str> = in_str.split(DELIMETER).collect();
     match v.len() {
