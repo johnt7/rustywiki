@@ -18,7 +18,7 @@ use std::{
 
 use rocket::{
     Data,
-    http::{ContentType, Cookie, Cookies, RawStr, Status, Header},
+    http::{ContentType, Cookie, Cookies, Status, Header},
     request::Form,
     Response,
     response::Redirect, 
@@ -36,14 +36,14 @@ use rocket_contrib::{
 mod authstruct;
 mod basic;
 mod config;
+mod logs;
 mod user;
 mod wikifile;
 
 use authstruct::AuthStruct;
-use config::ConfigurationStruct;
-use wikifile::{WikiStruct};
+use wikifile::WikiStruct;
 
-use user::{LogUser, User};
+use user::{User, PageUser};
 
 
 
@@ -53,12 +53,6 @@ const DATE_FORMAT : &str = "%Y/%m/%d %H:%M:%S%.3f";
 
 
 // types
-
-#[derive(Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct LogData {
-    log_text: String,
-}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -79,7 +73,7 @@ struct Wikilock {
 }
 
 #[derive(FromForm)]
-struct Login {
+pub struct Login {
     username: String,
     password: String
 }
@@ -130,36 +124,6 @@ impl PageMap {
     }
 }
 
-#[post("/jsLog/DebugNoTrunc", data = "<input>", rank=1)]
-fn rocket_route_js_debug_no_trunc(_log_user: LogUser, input: Json<LogData>) -> String {
-    warn!("RustyWiki Dbg: {}", input.log_text);
-    String::from("Ok t")
-}
-
-#[post("/jsLog/Debug", data = "<input>")]
-fn rocket_route_js_debug(_log_user: LogUser, input: Json<LogData>) -> String {
-    let in_length = input.log_text.len();
-    warn!("RustyWiki Dbg({}): {}", in_length, input.log_text.chars().take(256).collect::<String>());
-    String::from("Ok d")
-}
-
-#[post("/jsLog/Error", data = "<input>")]
-fn rocket_route_js_error(_log_user: LogUser, input: Json<LogData>) -> String {
-    error!("RustyWiki Err: {}", input.log_text.chars().collect::<String>());
-    String::from("Ok")
-}
-
-#[post("/jsLog/Exception", data = "<input>")]
-fn rocket_route_js_exception(_log_user: LogUser, input: Json<LogData>) -> String {
-    error!("RustyWiki Exc: {}", input.log_text.chars().collect::<String>());
-    String::from("Ok")
-}
-
-#[post("/jsLog/<rq>", data = "<input>")]
-fn rocket_route_js_log(_log_user: LogUser, rq: &RawStr, input: String) -> String {
-    info!("RustyWiki Log failed parse: {} {}", rq.as_str(), input);
-    String::from("520")
-}
 
 // TODO
 #[post("/jsUser/UserModify", data = "<input>")]
@@ -248,7 +212,7 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
 
 /// doe master reset of the system
 #[get("/jsAdmin/MasterReset")]
-fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<WikiStruct<ConfigurationStruct>>) -> String {
+fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>) -> String {
     error!("master reset 1");
     *delay_map.write().unwrap() = HashMap::new();
     error!("master reset 2");
@@ -271,7 +235,8 @@ fn rocket_route_media_index(_user: User, ) -> String {
 
 // TODO - what is this, why different from page?
 #[get("/wiki/<page_name>/<version>")]
-fn rocket_route_wiki(_user: User, page_name : String, version: Option<String>) -> io::Result<String> {
+fn rocket_route_wiki(user: PageUser, page_name : String, version: Option<String>) -> io::Result<String> {
+    error!("user={:?}", user);
     let version = version.unwrap_or("current".to_string());
     let path_name = format!("site/wiki/{}/{}", page_name, version);
    fs::read_to_string(path_name)
@@ -329,9 +294,9 @@ fn login_page() -> Option<File> {
 }
 
 #[post("/login", data = "<login>")]
-fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<AuthStruct>>) -> Result<Redirect, ()> {
+fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>) -> Result<Redirect, ()> {
 
-    if let Some(_) = authstruct::login_handle(&login.username, &login.password, &mut cookies, &umap) {
+    if let Some(_) = authstruct::login_handle(login, &mut cookies, &umap, &cfg) {
         error!("handled login");
         Ok(Redirect::to(uri!(site_top: "index.html")))
     } else {
@@ -362,9 +327,9 @@ fn create_rocket() -> rocket::Rocket {
     .mount("/css", StaticFiles::from("site/css"))  // use the site value from config
     .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
     .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
-    .mount("/", routes![rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
+    .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
         login_user, login_page, logout, login,
-        rocket_route_js_debug, rocket_route_js_exception, rocket_route_js_error, rocket_route_js_log,
+        logs::rocket_route_js_debug, logs::rocket_route_js_exception, logs::rocket_route_js_error, logs::rocket_route_js_log,
         rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
         rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
         rocket_route_media_index, rocket_route_page, rocket_route_wiki])

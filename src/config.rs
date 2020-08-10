@@ -8,7 +8,7 @@ use super::{
 	wikifile
 };
 
-type WikiConfig = wikifile::WikiStruct<config::ConfigurationStruct>;
+pub type WikiConfig = wikifile::WikiStruct<config::ConfigurationStruct>;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(rename_all = "PascalCase")]
@@ -16,7 +16,7 @@ type WikiConfig = wikifile::WikiStruct<config::ConfigurationStruct>;
 /// represents the tinywiki configuration file
 pub struct ConfigurationStruct {
 	pub case_sensitive : bool, // This should be set if the file system and thus wiki page names are case sensitive. If in doubt set to false.
-	pub authenticationequired_for_read : bool, // If true unautheticated users can read wiki pages
+	pub authentication_required_for_read : bool, // If true unautheticated users can read wiki pages
 	pub authentication_required_for_logging : bool, // Allows unauthenticated users to log debug. This is a potential denial of service vector.
 	pub allow_media_overwrite : bool, // Set to true to allow the overwriting media files on uploads.
 	pub start_page : String, // the page loaded by default as the starting wiki page.
@@ -29,7 +29,9 @@ pub struct ConfigurationStruct {
 }
 
 /// Loads it into a rocket sharable, with a lock
-pub fn load_config() -> Result<wikifile::WikiStruct<ConfigurationStruct>, Box<dyn error::Error>> {
+pub fn load_config() -> Result<WikiConfig, Box<dyn error::Error>> {
+//	pub fn load_config() -> Result<wikifile::WikiStruct<ConfigurationStruct>, Box<dyn error::Error>> {
+//	return Ok(wikifile::WikiStruct(RwLock::new( load_config_int()? )))
 	return Ok(wikifile::WikiStruct(RwLock::new( load_config_int()? )))
 }
 

@@ -5,9 +5,13 @@ use std::{
     sync::RwLock
 };
 
-use rocket::http::{Cookies, Cookie};
+use rocket::{
+    http::{Cookies, Cookie},
+    request::Form
+};
 
 use super::{
+    config,
     user::{User, AuthState},
     wikifile
 };
@@ -57,12 +61,19 @@ pub fn load_auth_int() -> Result<wikifile::WikiContainer<AuthStruct>, Box<dyn er
 
 
 // TODO - not happy with the encapsulation, look at refactoring
-pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &wikifile::WikiStruct<AuthStruct>) -> Option<User> {
+pub fn login_handle(login: Form<super::Login>, cookies: &mut Cookies<'_>, umap: &wikifile::WikiStruct<AuthStruct>, cfg: &config::WikiConfig) -> Option<User> {
     let thing = &umap.read().unwrap().data;
-    // TODO handle no auth case
-    let entry = thing.get(uname)?;
-    if entry.password != pwd { return None };
-    let u_tok = User {auth:AuthState::AuthAdmin, name: uname.to_string()}; // TODO get auth from list of admin
+
+    let entry = thing.get(&login.username)?;
+    if entry.password != login.password { return None };
+    let adm_list = &cfg.read().unwrap().data.admin_users;
+
+    let lvl = match adm_list.iter().any(|n| n==&login.username) {
+        true => AuthState::AuthAdmin,
+        false => AuthState::AuthUser
+    };
+    let u_tok = User {auth:lvl, name: login.username.to_string()};
+    error!("loging info={:?}", u_tok);
     cookies.add_private(Cookie::new("wiki_auth", u_tok.to_string()));
     Some(u_tok)
 }

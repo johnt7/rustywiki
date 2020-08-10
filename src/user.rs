@@ -12,7 +12,8 @@ use super::{
     config,
     wikifile
 };
-#[derive(Debug)]
+/// What kind of authorization is this?
+#[derive(Debug, PartialEq)]
 pub enum AuthState {
     AuthNotAuth,
     AuthUser,
@@ -40,6 +41,7 @@ impl fmt::Display for AuthState {
 }
 
 #[derive(Debug)]
+/// Structure that is used to represent a logged in user
 pub struct User {
     pub auth: AuthState,
     pub name: String
@@ -74,68 +76,70 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     }
 }
 
+#[derive(Debug)]
+/// Represents permission for a user to access the current page.
 pub struct PageUser(User);
 impl<'a, 'r> FromRequest<'a, 'r> for PageUser {
     type Error = ();
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<PageUser, Self::Error> {
-        // see if the user is authorized
-        if let Outcome::Success(user) = request.guard::<User>() {
-            return Outcome::Success(PageUser(user));
-        };
-        
+        // see if the user is logged in
+        let logged_in = request.guard::<User>(); 
+        error!("logged in={}", logged_in);
+        // find out if this page is an admin page
+        let is_admin = request.guard::<IsAdminPage>()?.0;
+        error!("is admin={:?}", is_admin);
+        // this is an admin page
+        if is_admin {
+            error!("got admin=");
+            return match logged_in {
+                Outcome::Success(u) => {
+                    error!("admin have user");
+                    if u.auth == AuthState::AuthAdmin {
+                        // user is logged in as admin, so allow
+                        error!("admin is admin user");
+                        Outcome::Success(PageUser(u))
+                    } else {
+                        // logged in but not admin
+                        error!("admin not admin user");
+                        Outcome::Failure((Status::Unauthorized, ()))
+                    }
+                },
+                _ => { 
+                    // not logged in
+                    error!("admin not logged in");
+                    Outcome::Failure((Status::Unauthorized, ()))
+                }
+            }
+        }
+ 
+        error!("NOTadmin");
+        // not admin, if don't need auth for read, then go ahead, otherwise ok if logged in.
         if let Outcome::Success(cfg) = request.guard::<State<wikifile::WikiStruct<config::ConfigurationStruct>>>() {
-            if !cfg.0.read().unwrap().data.authentication_required_for_logging {
-                return Outcome::Success(PageUser(User{auth: AuthState::AuthNotAuth, name: "".to_string()}));
+            error!("NOTadmin got cfg");
+            if !cfg.0.read().unwrap().data.authentication_required_for_read {
+                error!("NOTadmin not req");
+                return Outcome::Success(PageUser(
+                    // return the logged in user, or non-auth
+                    match logged_in {
+                        Outcome::Success(u) => u,
+                        _ => User{auth: AuthState::AuthNotAuth, name: "".to_string()}
+                    }
+                ));
+            }
+            error!("NOTadmin need re1");
+            if let Outcome::Success(u) = logged_in {
+                error!("NOTadmin logged in");
+                return Outcome::Success(PageUser(u));
             }
         };
+        error!("NOTadmin failed");
         Outcome::Failure((Status::Unauthorized, ()))
-
-        /*
-        let res = request.cookies().get_private("wiki_auth")
-        .and_then(|cookie| {
-            User::from_str(cookie.value()).ok()
-        });
-        match request.guard::<State<wikifile::WikiStruct<config::ConfigurationStruct>>>() {
-            Outcome::Success(cfg) => {
-                if !cfg.0.read().unwrap().data.authentication_required_for_logging {
-                    return Outcome::Success(PageUser);
-                }
-            },
-            _ => {}
-        };
-        match res {
-            Some(_) => Outcome::Success(PageUser),
-            None => Outcome::Failure((Status::Unauthorized, ()))
-        }
-        */
     }
 }
 
-pub struct LogUser;
-impl<'a, 'r> FromRequest<'a, 'r> for LogUser {
-    type Error = ();
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<LogUser, Self::Error> {
-        let res = request.cookies().get_private("wiki_auth")
-        .and_then(|cookie| {
-            User::from_str(cookie.value()).ok()
-        });
-        match request.guard::<State<wikifile::WikiStruct<config::ConfigurationStruct>>>() {
-            Outcome::Success(cfg) => {
-                if !cfg.0.read().unwrap().data.authentication_required_for_logging {
-                    return Outcome::Success(LogUser);
-                }
-            },
-            _ => {}
-        };
-        match res {
-            Some(_) => Outcome::Success(LogUser),
-            None => Outcome::Failure((Status::Unauthorized, ()))
-        }
-    }
-}
-
+/// is the current page an admin page?
 pub struct IsAdminPage(bool);
 impl<'a, 'r> FromRequest<'a, 'r> for IsAdminPage {
     type Error = ();
@@ -145,7 +149,10 @@ impl<'a, 'r> FromRequest<'a, 'r> for IsAdminPage {
             Outcome::Success(cfg) => {
                 let path = request.uri().path();
                 let adm_list = &cfg.read().unwrap().data.admin_pages;
-                Outcome::Success(IsAdminPage(adm_list.iter().any(|e| e == path)))
+                Outcome::Success(IsAdminPage(adm_list.iter().any(|e| {
+                    error!("e={} path={}", e, path);
+                    path.starts_with(e)//.starts_with(path)
+                })))
             },
             _ => {
                 Outcome::Failure((Status::Unauthorized, ())) 
