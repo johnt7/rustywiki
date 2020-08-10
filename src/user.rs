@@ -1,7 +1,6 @@
 use std::{
     fmt,
     str::FromStr,
-    sync::RwLock
 };
 use rocket::{
     http::Status,

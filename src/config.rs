@@ -4,13 +4,13 @@ use std::{
 };
 
 use super::wikifile;
-
+/*
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ConfigContainer {
     pub config : ConfigurationStruct,
     pub header : wikifile::PageRevisionStruct
 }
-
+*/
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
@@ -39,7 +39,7 @@ pub fn load_config_int() -> Result<wikifile::WikiContainer<ConfigurationStruct>,
     }
     Err("Failed to load".into())
 }
-
+/*
 impl ConfigContainer {
 	pub fn auth_req_read(&self) -> bool {
 		self.config.authenticationequired_for_read
@@ -49,3 +49,4 @@ impl ConfigContainer {
 		self.config.authentication_required_for_logging
 	}
 }
+*/

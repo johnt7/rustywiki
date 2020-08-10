@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     error,
     fs,
+    ops::Deref,
     path::Path,
     sync::RwLock
 };
@@ -94,4 +95,10 @@ pub struct WikiContainer<S> {
 }
 
 pub struct WikiStruct<S> (pub RwLock<WikiContainer<S>>);
+impl<S> Deref for WikiStruct<S> {
+    type Target = RwLock<WikiContainer<S>>;
 
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
