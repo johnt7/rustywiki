@@ -85,7 +85,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for LogUser {
         });
         match request.guard::<State<wikifile::WikiStruct<config::ConfigurationStruct>>>() {
             Outcome::Success(cfg) => {
-                error!("log?={}", cfg.0.read().unwrap().data.authentication_required_for_logging);
                 if !cfg.0.read().unwrap().data.authentication_required_for_logging {
                     return Outcome::Success(LogUser);
                 }

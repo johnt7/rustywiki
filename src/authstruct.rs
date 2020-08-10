@@ -13,7 +13,7 @@ use super::{
 };
 
 
-
+/*
 #[derive(Debug)]
 pub struct AuthStruct (RwLock<AuthStructInternal>);
 impl Deref for AuthStruct {
@@ -30,8 +30,17 @@ pub struct AuthStructInternal {
     pub header : wikifile::PageRevisionStruct
 }
 
+*/
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AuthStruct (HashMap<String, UserStruct>);
+impl Deref for AuthStruct {
+    type Target = HashMap<String, UserStruct>;
 
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 /// Use to load and write to file
 #[derive(Serialize, Deserialize, Debug)]
 struct Wrapper {
@@ -48,26 +57,32 @@ pub struct UserStruct {
 	comment : String 
 }
 
+pub fn load_auth() -> Result<wikifile::WikiStruct<AuthStruct>, Box<dyn error::Error>> {
+	return Ok(wikifile::WikiStruct(RwLock::new( load_auth_int()? )))
+}
+/*
 /// Tries to load the config file for a tiny wiki
 pub fn load_auth() -> Result<AuthStruct, Box<dyn error::Error>> {
         return Ok(AuthStruct(RwLock::new( load_auth_int()? )))
 }
+*/
 
 /// Tries to load the config file to an AuthStructInternal
-pub fn load_auth_int() -> Result<AuthStructInternal, Box<dyn error::Error>> {
-    // TODO, examine to see about cleaning this code up a bit
+    pub fn load_auth_int() -> Result<wikifile::WikiContainer<AuthStruct>, Box<dyn error::Error>> {
+//    pub fn load_auth_int() -> Result<AuthStructInternal, Box<dyn error::Error>> {
+        // TODO, examine to see about cleaning this code up a bit
     if let Ok((um, hdr)) = wikifile::load_parts("site/wiki/_user/current") {
         let umwin: Wrapper = serde_json::from_str(&um)?;
-        let umap = umwin.user_list.iter().map(|us| (us.user.clone(), us.clone())).collect();
-        return Ok(AuthStructInternal{user_map: umap, header: hdr})
+        let umap = AuthStruct(umwin.user_list.iter().map(|us| (us.user.clone(), us.clone())).collect());
+        return Ok(wikifile::WikiContainer{data: umap, header: hdr})
     }
     Err("Failed to load".into())
 }
 
 
 // TODO - not happy with the encapsulation,
-pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &AuthStruct) -> Option<User> {
-    let thing = &umap.read().unwrap().user_map;
+pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &wikifile::WikiStruct<AuthStruct>) -> Option<User> {
+    let thing = &umap.read().unwrap().data;
     // TODO handle no auth case
     let entry = thing.get(uname)?;
     if entry.password != pwd { return None };
@@ -77,7 +92,7 @@ pub fn login_handle(uname: &str, pwd: &str, cookies: &mut Cookies<'_>, umap: &Au
 }
 
 
-
+/*
 /// Generates an AuthStruct - debug only
 pub fn gen_auth() -> AuthStruct {
     AuthStruct(RwLock::new(AuthStructInternal{     
@@ -95,3 +110,4 @@ pub fn gen_auth() -> AuthStruct {
         }
     }))
 }
+*/

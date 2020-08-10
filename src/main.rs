@@ -248,7 +248,7 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
 
 // TODO
 #[get("/jsAdmin/MasterReset")]
-fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<AuthStruct>, cfg: State<WikiStruct<ConfigurationStruct>>) -> String {
+fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<WikiStruct<ConfigurationStruct>>) -> String {
     error!("master reset 1");
     *delay_map.write().unwrap() = HashMap::new();
     error!("master reset 2");
@@ -327,7 +327,7 @@ fn login_page() -> Option<File> {
 }
 
 #[post("/login", data = "<login>")]
-fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<AuthStruct>) -> Result<Redirect, ()> {
+fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<AuthStruct>>) -> Result<Redirect, ()> {
 
     if let Some(_) = authstruct::login_handle(&login.username, &login.password, &mut cookies, &umap) {
         error!("handled login");
