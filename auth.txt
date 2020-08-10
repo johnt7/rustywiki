@@ -3,6 +3,7 @@ case_sensitive
 - how do I get it during load etc?
 
 logging=jsLog - log use auth
+- look for login, fail if bad, no redirect
 
 page=wikiPage || otherPage
 otherpage=path == "/" || path == "/index.html" || path == "/wikiserver.log" || path == "/favicon.ico" || strings.Index( path, "/css/") == 0 || strings.Index( path, "/js/") == 0 || strings.Index( path, "/media/")
@@ -13,3 +14,9 @@ is_admin - ! in admin list
 is_admin
 
 page log
+
+
+mediaIndex - string that is stored and refreshed
+
+/page/ - loads index.html with page in dummy
+/wiki/page/version - returns the page as is

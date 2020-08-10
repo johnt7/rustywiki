@@ -3,7 +3,12 @@ use std::{
     sync::RwLock
 };
 
-use super::wikifile;
+use super::{
+	config,
+	wikifile
+};
+
+type WikiConfig = wikifile::WikiStruct<config::ConfigurationStruct>;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(rename_all = "PascalCase")]

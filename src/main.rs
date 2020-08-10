@@ -29,7 +29,7 @@ use rocket_contrib::{
     serve::StaticFiles,
     json::Json
 };
-
+//use simplelog::*;
 
 // Modules
 #[cfg(test)] mod tests;
@@ -246,7 +246,7 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
     String::from("Ok")
 }
 
-// TODO
+/// doe master reset of the system
 #[get("/jsAdmin/MasterReset")]
 fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<WikiStruct<ConfigurationStruct>>) -> String {
     error!("master reset 1");
@@ -255,7 +255,9 @@ fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageM
     *page_locks.write().unwrap() = HashMap::new();
     error!("master reset 3");
     *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
+    error!("master reset 4");
     *cfg.write().unwrap() =  config::load_config_int().unwrap();
+    error!("master reset 5");
 
     String::from("Ok")
 }
@@ -370,7 +372,17 @@ fn create_rocket() -> rocket::Rocket {
 
 
 fn main() {
-   let _config = get_command_line();
+    // TODO - use the command line values
+    let _config = get_command_line();
+    // TODO, look at alternative logger than simplelog
+    /*
+    CombinedLogger::init(
+        vec![
+//            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed),
+            WriteLogger::new(LevelFilter::Info, Config::default(), File::create("site/my_rust_binary.log").unwrap()),
+        ]
+    ).unwrap();
+    */
     create_rocket().launch();
 }
 

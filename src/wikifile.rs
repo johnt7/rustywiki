@@ -89,11 +89,13 @@ fn join_version(ver_str : &str, data_str : &str) -> String {
 
 
 #[derive(Deserialize, Serialize, Debug)]
+/// container used to store data and version for it, such as config and user data
 pub struct WikiContainer<S> {
     pub data : S,
     pub header : PageRevisionStruct
 }
 
+/// Structure used to store containers in Rocket to allow shared mutability
 pub struct WikiStruct<S> (pub RwLock<WikiContainer<S>>);
 impl<S> Deref for WikiStruct<S> {
     type Target = RwLock<WikiContainer<S>>;
