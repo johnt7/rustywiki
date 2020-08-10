@@ -5,7 +5,14 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 
-// TODO - look at what happens with /wiki/foo and /page/foo/version
+// TODO - refactor clap and other parts of main
+//      - test user auth
+//      - media index, generate, return and master reset
+//      - user api
+//      - centralized file handling
+//      - cleanups
+
+
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -97,6 +104,7 @@ struct RequestDelayStruct {
     _last : Instant
 }
 
+/// Structure passed to Rocket to allow storage of delay  information
 struct DelayMap ( RwLock<HashMap<String, RequestDelayStruct>> );
 impl Deref for DelayMap {
     type Target = RwLock<HashMap<String, RequestDelayStruct>>;
@@ -110,6 +118,8 @@ impl DelayMap {
         DelayMap ( RwLock::new(HashMap::new()) )
     }
 }
+
+/// Structure passed to Rocket to store page locks
 struct PageMap ( RwLock<HashMap<String, String>> );
 impl Deref for PageMap {
     type Target = RwLock<HashMap<String, String>>;
@@ -133,7 +143,7 @@ fn rocket_route_user_modify(input: Json<UserModify>) -> String {
     String::from("Ok")
 }
 
-// TODO
+// TODO - clean up messages
 #[post("/jsUser/Wikisave", data = "<input>")]
 fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
     error!("wiki save {} {} {} {} {} {} {} {} {}", input.page, input.revision, input.previous_revision, input.create_date, input.revision_date, input.revised_by, input.comment, input.lock, input.data);
@@ -210,7 +220,8 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
     String::from("Ok")
 }
 
-/// doe master reset of the system
+// TODO - cleanup output
+/// do master reset of the system
 #[get("/jsAdmin/MasterReset")]
 fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>) -> String {
     error!("master reset 1");
@@ -222,6 +233,7 @@ fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageM
     error!("master reset 4");
     *cfg.write().unwrap() =  config::load_config_int().unwrap();
     error!("master reset 5");
+    // TODO - reload media index
 
     String::from("Ok")
 }
@@ -233,7 +245,7 @@ fn rocket_route_media_index(_user: User, ) -> String {
     String::from("Ok")
 }
 
-// TODO - what is this, why different from page?
+/// Gets the wiki page requested
 #[get("/wiki/<page_name>/<version>")]
 fn rocket_route_wiki(user: PageUser, page_name : String, version: Option<String>) -> io::Result<String> {
     error!("user={:?}", user);
@@ -242,6 +254,7 @@ fn rocket_route_wiki(user: PageUser, page_name : String, version: Option<String>
    fs::read_to_string(path_name)
 }
 
+/// Get the index page, with default set to page_name
 #[get("/page/<page_name>")]
 fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
     let path_name = "site/index.html".to_string();
@@ -263,11 +276,14 @@ fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
 }
 
 #[get("/")]
+/// redirect from / to /index.html
 fn site_root() -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
 
+
 #[get("/<file_name>", rank=5)]
+/// get one of the top level files
 fn site_top(_user: User, file_name: String) -> Option<File> {
     if file_name!="index.html" &&
     file_name!="favicon.ico" {
@@ -277,23 +293,27 @@ fn site_top(_user: User, file_name: String) -> Option<File> {
     File::open(&filename).ok()
 }
 
-#[get("/<_pathnames..>", rank = 20)] // high enough to be after the static files which are 10
+#[get("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
+/// any get request to the site (does not include /) that get here is not authorized
 fn site_nonauth(_pathnames: PathBuf) -> Redirect {
    Redirect::to(uri!(site_top: "login.html"))
 }
 
 #[get("/login.html", rank = 1)]
+/// already logged in, redirect to /index.html
 fn login_user(_user: User) -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
 
 #[get("/login.html", rank = 2)]
+/// return login page
 fn login_page() -> Option<File> {
     let filename = format!("site/login.html");
     File::open(&filename).ok()
 }
 
 #[post("/login", data = "<login>")]
+/// Post from the login page, try to set auth cookie
 fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>) -> Result<Redirect, ()> {
 
     if let Some(_) = authstruct::login_handle(login, &mut cookies, &umap, &cfg) {
@@ -306,25 +326,27 @@ fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<Au
 }
 
 #[post("/logout", rank = 1)]
+/// got logout request, forget cookie
 fn logout(mut cookies: Cookies<'_>) -> Redirect {
     cookies.remove_private(Cookie::named("wiki_auth"));
     Redirect::to(uri!(site_top: "index.html"))
  }
 
 
+/// create the Rocket instance.  Having it separate allows easier testing.
 fn create_rocket() -> rocket::Rocket {
     let auth =  authstruct::load_auth().unwrap();
     let cfg = config::load_config().unwrap();
 
-    let delay_map = DelayMap::new();// ( RwLock::new(HashMap::new()) );
-    let lock_map = PageMap::new(); // ( RwLock::new(HashMap::new()) );
+    let delay_map = DelayMap::new();
+    let lock_map = PageMap::new(); 
 
     rocket::ignite()
     .manage(auth)
     .manage(cfg)
     .manage(delay_map)
     .manage(lock_map)
-    .mount("/css", StaticFiles::from("site/css"))  // use the site value from config
+    .mount("/css", StaticFiles::from("site/css"))  // TODO, secure? use the site value from config
     .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
     .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
     .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
