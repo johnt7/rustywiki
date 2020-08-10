@@ -15,11 +15,13 @@ use super::{
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
+/// Structure used for log request bodies
 pub struct LogData {
     pub log_text: String,
 }
 
-/// Used to represent if the user is allowed to write to logs
+/// Structure used to represent whether the user is allowed to write to logs
+/// Either unauthenticated logging is allowed, or they have to be logged in
 pub struct LogUser;
 impl<'a, 'r> FromRequest<'a, 'r> for LogUser {
     type Error = ();
@@ -47,14 +49,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for LogUser {
 #[post("/jsLog/DebugNoTrunc", data = "<input>", rank=1)]
 pub fn rocket_route_js_debug_no_trunc(_log_user: LogUser, input: Json<LogData>) -> String {
     warn!("RustyWiki Dbg: {}", input.log_text);
-    String::from("Ok t")
+    String::from("Ok")
 }
 
 #[post("/jsLog/Debug", data = "<input>")]
 pub fn rocket_route_js_debug(_log_user: LogUser, input: Json<LogData>) -> String {
     let in_length = input.log_text.len();
     warn!("RustyWiki Dbg({}): {}", in_length, input.log_text.chars().take(256).collect::<String>());
-    String::from("Ok d")
+    String::from("Ok")
 }
 
 #[post("/jsLog/Error", data = "<input>")]
@@ -69,8 +71,18 @@ pub fn rocket_route_js_exception(_log_user: LogUser, input: Json<LogData>) -> St
     String::from("Ok")
 }
 
+// TODO - fix outcome
 #[post("/jsLog/<rq>", data = "<input>")]
+/// Fallback if any of the log attempts didn't parse.
 pub fn rocket_route_js_log(_log_user: LogUser, rq: &RawStr, input: String) -> String {
     info!("RustyWiki Log failed parse: {} {}", rq.as_str(), input);
     String::from("520")
+}
+
+// TODO - fix outcome
+#[post("/jsLog/<rq>", data = "<input>")]
+/// Fallback if any of the log attempts didn't parse.
+pub fn rocket_nonauth_js_log(rq: &RawStr, input: String) -> String {
+    info!("RustyWiki Log failed parse: {} {}", rq.as_str(), input);
+    String::from("Unauthroized")
 }
