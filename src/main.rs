@@ -7,7 +7,6 @@
 
 // TODO - refactor main
 //      - test user auth
-//      - media index, generate, return and master reset
 //      - user api calls
 //      - centralized file handling
 //      - cleanups
@@ -28,6 +27,7 @@ use std::{
 };
 
 use rocket::{
+    config::{Config, Environment},
     Data,
     http::{ContentType, Cookie, Cookies, Status, Header},
     request::Form,
@@ -40,7 +40,7 @@ use rocket_contrib::{
     serve::StaticFiles,
     json::Json
 };
-//use simplelog::*;
+use rocket_prometheus::PrometheusMetrics;
 
 // Modules
 #[cfg(test)] mod tests;
@@ -49,6 +49,7 @@ mod cmdline;
 mod basic;
 mod config;
 mod logs;
+mod media;
 mod user;
 mod wikifile;
 
@@ -168,7 +169,6 @@ fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<wikifile::Page
         return Status::new(521, "wrong lock");
     }
     error!("page lock ok");
-//    let data = input.data.split_off(input.data.len()-1);
     match wikifile::write_parts(&input, &input.data) {
         Ok(_) => Status::Ok,
         _ => Status::new(522, "failed to write")
@@ -228,32 +228,20 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
 // TODO - cleanup output
 /// do master reset of the system
 #[get("/jsAdmin/MasterReset")]
-fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>) -> String {
-    error!("master reset 1");
+fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) -> String {
     *delay_map.write().unwrap() = HashMap::new();
-    error!("master reset 2");
     *page_locks.write().unwrap() = HashMap::new();
-    error!("master reset 3");
     *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
-    error!("master reset 4");
     *cfg.write().unwrap() =  config::load_config_int().unwrap();
     error!("master reset 5");
-    // TODO - reload media index
-
-    String::from("Ok")
-}
-
-// TODO
-#[get("/page/MediaIndex")]
-fn rocket_route_media_index(_user: User, ) -> String {
-    debug!("media index");
+    *mi.write().unwrap() = media::media_str();
+    error!("master reset 5");
     String::from("Ok")
 }
 
 /// Gets the wiki page requested
 #[get("/wiki/<page_name>/<version>")]
-fn rocket_route_wiki(user: PageUser, page_name : String, version: Option<String>) -> io::Result<String> {
-    error!("user={:?}", user);
+fn rocket_route_wiki(_user: PageUser, page_name : String, version: Option<String>) -> io::Result<String> {
     let version = version.unwrap_or("current".to_string());
     let path_name = format!("site/wiki/{}/{}", page_name, version);
    fs::read_to_string(path_name)
@@ -339,18 +327,30 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
 
 
 /// create the Rocket instance.  Having it separate allows easier testing.
-fn create_rocket(_cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
+fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
+    // TODO - use info in cmd_cfg
+    let config = Config::build(Environment::Staging)
+    .address("localhost")
+    .port(cmd_cfg.port)
+    .finalize().unwrap();
+
     let auth =  authstruct::load_auth().unwrap();
     let cfg = config::load_config().unwrap();
+    let mi = media::MediaIndex::new();
 
     let delay_map = DelayMap::new();
     let lock_map = PageMap::new(); 
+    let prometheus = PrometheusMetrics::new();
 
-    rocket::ignite()
+//    rocket::ignite()
+    rocket::custom(config)
     .manage(auth)
     .manage(cfg)
     .manage(delay_map)
     .manage(lock_map)
+    .manage(mi)
+    .attach(prometheus.clone())
+    .mount("/metrics", prometheus)
     .mount("/css", StaticFiles::from("site/css"))  // TODO, secure? use the site value from config
     .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
     .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
@@ -359,19 +359,12 @@ fn create_rocket(_cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
         logs::rocket_route_js_debug, logs::rocket_route_js_exception, logs::rocket_route_js_error, logs::rocket_route_js_log,
         rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
         rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
-        rocket_route_media_index, rocket_route_page, rocket_route_wiki])
+        media::rocket_route_media_index, rocket_route_page, rocket_route_wiki])
 }
 
 
 fn main() {
-   /*
-    CombinedLogger::init(
-        vec![
-            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed),
-            WriteLogger::new(LevelFilter::Info, Config::default(), File::create("site/my_rust_binary.log").unwrap()),
-        ]
-    ).unwrap();
-    */
+    println!("media={}", media::media_str());
     let config = cmdline::get_command_line();
     create_rocket(config).launch();
 }
