@@ -41,6 +41,7 @@ use rocket_contrib::{
 // Modules
 #[cfg(test)] mod tests;
 mod authstruct;
+mod cmdline;
 mod basic;
 mod config;
 mod logs;
@@ -334,7 +335,7 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
 
 
 /// create the Rocket instance.  Having it separate allows easier testing.
-fn create_rocket() -> rocket::Rocket {
+fn create_rocket(_cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     let auth =  authstruct::load_auth().unwrap();
     let cfg = config::load_config().unwrap();
 
@@ -359,10 +360,9 @@ fn create_rocket() -> rocket::Rocket {
 
 
 fn main() {
-    // TODO - use the command line values
-    let _config = get_command_line();
+    let config = cmdline::get_command_line();
+   /*
     // TODO, look at alternative logger than simplelog
-    /*
     CombinedLogger::init(
         vec![
 //            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed),
@@ -370,14 +370,14 @@ fn main() {
         ]
     ).unwrap();
     */
-    create_rocket().launch();
+    create_rocket(config).launch();
 }
 
 
 
 
 // command line parsing.  TODO Not sure how to move to other module with macros
-
+/*
 /// Command line configuration information
 #[derive(Debug)]
 pub struct ConfigInfo {
@@ -411,7 +411,7 @@ pub fn get_command_line() -> ConfigInfo {
         port : matches.value_of("port").unwrap_or("9990").parse().unwrap_or(9990)
     }
 }
-
+*/
 
 
 
