@@ -6,7 +6,10 @@ use std::{
     path::PathBuf,
     sync::RwLock
 };
-use super::user;
+use super::{
+    user,
+    wikifile
+};
 
 #[get("/page/MediaIndex")]
 pub fn rocket_route_media_index(_user: user::User, mi: State<MediaIndex>) -> String {
@@ -33,7 +36,8 @@ fn dir_list(dir: PathBuf) -> Result<String, Box<dyn error::Error>> {
 }
 
 pub fn media_str() -> String {
-    dir_list(PathBuf::from("site/media")).unwrap_or("failed".to_string() )
+//    dir_list(PathBuf::from("site/media")).unwrap_or("failed".to_string() )
+    dir_list(wikifile::get_path("media")).unwrap_or("failed".to_string() )
 }
 
 pub struct MediaIndex (RwLock<String>);

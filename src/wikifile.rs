@@ -6,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
     sync::RwLock
 };
+use super::wikifile;
 
 const DELIMETER : &str = "<!--REVISION HEADER DEMARCATION>";
 
@@ -52,7 +53,8 @@ pub fn load_parts<P: AsRef<Path>>(path: P) -> Result<(String, PageRevisionStruct
 
 /// Takes a revision structure and data and writes them to the wiki
 pub fn write_parts(vers: &PageRevisionStruct, data: &str) -> Result<(), Box<dyn error::Error>> {
-    let pbase = Path::new("site/wiki/").join(&vers.page);
+//    let pbase = Path::new("site/wiki/").join(&vers.page);
+    let pbase = wikifile::get_path("wiki").join(&vers.page);
 
     let vinfo = serde_json::to_string_pretty(vers)?;
     let all = join_version(&vinfo, data);
@@ -114,6 +116,8 @@ pub fn set_path(root_path: String) {
 }
 pub fn get_path(path_ext: &str) -> PathBuf {
     unsafe {
+        println!("get path={}", path_ext);
+        println!("root={:?}", FILE_ROOT);
         PathBuf::from(FILE_ROOT.as_ref().unwrap()).join(path_ext)
     }
 }

@@ -8,7 +8,6 @@
 // TODO - refactor main
 //      - finish applying PageUser and then test user auth
 //      - user api calls
-//      - centralized file handling
 //      - cleanups
 //      - wikisave should put user into version info
 //      - fixes to index.html
@@ -152,7 +151,6 @@ fn rocket_route_user_modify(input: Json<UserModify>) -> String {
 // TODO - clean up messages
 #[post("/jsUser/Wikisave", data = "<input>")]
 fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
-    error!("wiki save {} {} {} {} {} {} {} {} {}", input.page, input.revision, input.previous_revision, input.create_date, input.revision_date, input.revised_by, input.comment, input.lock, input.data);
     if input.revision == "" || input.previous_revision == "" {
         return Status::new(519, "no revision or previous revision");
     }
@@ -160,7 +158,6 @@ fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<w
         return Status::new(519, "no lock or page");
     }
     let mp = lock_data.read().unwrap();
-    error!("page data ok");
     if let Some(lock_token) = mp.get(&input.page) {
         if lock_token != &input.lock {
             return Status::new(520, "wrong lock");
@@ -168,7 +165,6 @@ fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<w
     } else {
         return Status::new(521, "wrong lock");
     }
-    error!("page lock ok");
     match wikifile::write_parts(&input, &input.data) {
         Ok(_) => Status::Ok,
         _ => Status::new(522, "failed to write")
@@ -243,21 +239,23 @@ fn rocket_route_master_reset(_user: User, delay_map: State<DelayMap>, page_locks
 #[get("/wiki/<page_name>/<version>")]
 fn rocket_route_wiki(_user: User, page_name : String, version: Option<String>) -> io::Result<String> {
     let version = version.unwrap_or("current".to_string());
-    let path_name = format!("site/wiki/{}/{}", page_name, version);
+//    let path_name = format!("site/wiki/{}/{}", page_name, version);
+    let path_name = wikifile::get_path("wiki").join(page_name).join(version);
    fs::read_to_string(path_name)
 }
 
 /// Get the index page, with default set to page_name
 #[get("/page/<page_name>")]
 fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
-    let path_name = "site/index.html".to_string();
+//    let path_name = "site/index.html".to_string();
+    let path_name = wikifile::get_path("index.html");
     let mut response = Response::new();
     response.set_header(Header::new("Content-Type", "text/html"));
     match fs::read_to_string(&path_name) {
         Err(err) => {
             let err = format!("{}", err);
             response.set_status(Status::InternalServerError);
-            error!("Could not load {}. Error-{}", path_name, err);
+            error!("Could not load {:?}. Error-{}", path_name, err);
             response.set_sized_body(Cursor::new(err));
         },
         Ok(index_str) => {
@@ -279,11 +277,13 @@ fn site_root() -> Redirect {
 /// get one of the top level files
 fn site_top(_user: User, file_name: String) -> Option<File> {
     if file_name!="index.html" &&
-    file_name!="favicon.ico" {
+        file_name!="favicon.ico" {
         return None
     }
-    let filename = format!("site/{}", file_name);
-    File::open(&filename).ok()
+//   let filename = format!("site/{}", file_name);
+//    let filename = wikifile::get_path(&file_name);
+//    File::open(&filename).ok()
+    File::open(&wikifile::get_path(&file_name)).ok()
 }
 
 #[get("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
@@ -301,8 +301,9 @@ fn login_user(_user: User) -> Redirect {
 #[get("/login.html", rank = 2)]
 /// return login page
 fn login_page() -> Option<File> {
-    let filename = format!("site/login.html");
-    File::open(&filename).ok()
+//    let filename = format!("site/login.html");
+//    File::open(&filename).ok()
+    File::open(&wikifile::get_path("login.html")).ok()
 }
 
 #[post("/login", data = "<login>")]
@@ -334,7 +335,9 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     .port(cmd_cfg.port)
     .finalize().unwrap();
 
+    println!("set path to={:?}", cmd_cfg);
     wikifile::set_path(cmd_cfg.site);
+    println!("done.....");
     let path = wikifile::get_path("foo");
     println!("path={:?} last={:?}", path, path.file_name());
 
@@ -356,9 +359,9 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     .manage(mi)
     .attach(prometheus.clone())
     .mount("/metrics", prometheus)
-    .mount("/css", StaticFiles::from("site/css"))  // TODO, secure? use the site value from config
-    .mount("/js", StaticFiles::from("site/js"))  // use the site value from config
-    .mount("/media", StaticFiles::from("site/media"))  // use the site value from config
+    .mount("/css", StaticFiles::from(wikifile::get_path("css")))  // TODO, secure? use the site value from config
+    .mount("/js", StaticFiles::from(wikifile::get_path("js")))  // use the site value from config
+    .mount("/media", StaticFiles::from(wikifile::get_path("media")))  // use the site value from config
     .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
         login_user, login_page, logout, login,
         logs::rocket_route_js_debug, logs::rocket_route_js_exception, logs::rocket_route_js_error, logs::rocket_route_js_log,
@@ -369,7 +372,6 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
 
 
 fn main() {
-    println!("media={}", media::media_str());
     let config = cmdline::get_command_line();
     create_rocket(config).launch();
 }
