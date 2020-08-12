@@ -30,15 +30,13 @@ pub struct ConfigurationStruct {
 
 /// Loads it into a rocket sharable, with a lock
 pub fn load_config() -> Result<WikiConfig, Box<dyn error::Error>> {
-//	pub fn load_config() -> Result<wikifile::WikiStruct<ConfigurationStruct>, Box<dyn error::Error>> {
-//	return Ok(wikifile::WikiStruct(RwLock::new( load_config_int()? )))
 	return Ok(wikifile::WikiStruct(RwLock::new( load_config_int()? )))
 }
 
 /// try to load core structure from the core data for a tiny wiki config
 pub fn load_config_int() -> Result<wikifile::WikiContainer<ConfigurationStruct>, Box<dyn error::Error>> {
-    if let Ok((cfg, hdr)) = wikifile::load_parts("site/wiki/_config/current") {
-        return Ok(wikifile::WikiContainer{data: serde_json::from_str(&cfg)?, header: hdr});
+    if let Ok((cfg, hdr)) = wikifile::load_parts(wikifile::get_path("wiki/_config/current")) {
+		return Ok(wikifile::WikiContainer{data: serde_json::from_str(&cfg)?, header: hdr});
     }
     Err("Failed to load".into())
 }

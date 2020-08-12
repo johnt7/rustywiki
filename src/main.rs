@@ -13,6 +13,7 @@
 //      - fixes to index.html
 //          update revision data
 //      - look at other loggers
+//      -https
 
 
 use std::{
@@ -148,8 +149,8 @@ fn rocket_route_user_modify(input: Json<UserModify>) -> String {
     String::from("Ok")
 }
 
-// TODO - clean up messages
 #[post("/jsUser/Wikisave", data = "<input>")]
+/// save a wiki page, updating revision info
 fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
     if input.revision == "" || input.previous_revision == "" {
         return Status::new(519, "no revision or previous revision");
@@ -163,7 +164,7 @@ fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<w
             return Status::new(520, "wrong lock");
         }
     } else {
-        return Status::new(521, "wrong lock");
+        return Status::new(521, "no lock");
     }
     match wikifile::write_parts(&input, &input.data) {
         Ok(_) => Status::Ok,
@@ -192,7 +193,7 @@ fn rocket_route_user_unlock(_user: User, lock_data : State<PageMap>, input: Json
         return None;
     }
     let mut mp = lock_data.write().unwrap();
-    // find if there is a lock and if so make sure the lock keys match
+    // find if there is a lock on the page and if so make sure the lock tokens match
     if let Some(ll) = mp.get(&input.page) {
         if ll != &input.lock {
             return None;
@@ -221,7 +222,6 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
     String::from("Ok")
 }
 
-// TODO - cleanup output
 /// do master reset of the system
 #[get("/jsAdmin/MasterReset")]
 fn rocket_route_master_reset(_user: User, delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) -> String {
@@ -229,9 +229,7 @@ fn rocket_route_master_reset(_user: User, delay_map: State<DelayMap>, page_locks
     *page_locks.write().unwrap() = HashMap::new();
     *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
     *cfg.write().unwrap() =  config::load_config_int().unwrap();
-    error!("master reset 5");
     *mi.write().unwrap() = media::media_str();
-    error!("master reset 5");
     String::from("Ok")
 }
 
@@ -266,48 +264,43 @@ fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
     response
 }
 
-#[get("/")]
 /// redirect from / to /index.html
+#[get("/")]
 fn site_root() -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
 
 
-#[get("/<file_name>", rank=5)]
 /// get one of the top level files
+#[get("/<file_name>", rank=5)]
 fn site_top(_user: User, file_name: String) -> Option<File> {
     if file_name!="index.html" &&
         file_name!="favicon.ico" {
         return None
     }
-//   let filename = format!("site/{}", file_name);
-//    let filename = wikifile::get_path(&file_name);
-//    File::open(&filename).ok()
     File::open(&wikifile::get_path(&file_name)).ok()
 }
 
-#[get("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
 /// any get request to the site (does not include /) that get here is not authorized
+#[get("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
 fn site_nonauth(_pathnames: PathBuf) -> Redirect {
    Redirect::to(uri!(site_top: "login.html"))
 }
 
-#[get("/login.html", rank = 1)]
 /// already logged in, redirect to /index.html
+#[get("/login.html", rank = 1)]
 fn login_user(_user: User) -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
 
-#[get("/login.html", rank = 2)]
 /// return login page
+#[get("/login.html", rank = 2)]
 fn login_page() -> Option<File> {
-//    let filename = format!("site/login.html");
-//    File::open(&filename).ok()
     File::open(&wikifile::get_path("login.html")).ok()
 }
 
-#[post("/login", data = "<login>")]
 /// Post from the login page, try to set auth cookie
+#[post("/login", data = "<login>")]
 fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>) -> Result<Redirect, ()> {
 
     if let Some(_) = authstruct::login_handle(login, &mut cookies, &umap, &cfg) {
@@ -319,8 +312,8 @@ fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<Au
     }
 }
 
-#[post("/logout", rank = 1)]
 /// got logout request, forget cookie
+#[post("/logout", rank = 1)]
 fn logout(mut cookies: Cookies<'_>) -> Redirect {
     cookies.remove_private(Cookie::named("wiki_auth"));
     Redirect::to(uri!(site_top: "index.html"))
@@ -330,22 +323,23 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
 /// create the Rocket instance.  Having it separate allows easier testing.
 fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     // TODO - use info in cmd_cfg
+    //      - write to log file or to console
+    //      - certificate location
+
+    // tell Rocket to use the specified port
     let config = Config::build(Environment::Staging)
     .address("localhost")
     .port(cmd_cfg.port)
     .finalize().unwrap();
 
-    println!("set path to={:?}", cmd_cfg);
+    // set the centralized file system roo
     wikifile::set_path(cmd_cfg.site);
-    println!("done.....");
-    let path = wikifile::get_path("foo");
-    println!("path={:?} last={:?}", path, path.file_name());
 
+    // create the objects needed for running the wiki
     let auth =  authstruct::load_auth().unwrap();
     println!("suth={:?}", auth.read());
     let cfg = config::load_config().unwrap();
     let mi = media::MediaIndex::new();
-
     let delay_map = DelayMap::new();
     let lock_map = PageMap::new(); 
     let prometheus = PrometheusMetrics::new();
@@ -359,9 +353,9 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     .manage(mi)
     .attach(prometheus.clone())
     .mount("/metrics", prometheus)
-    .mount("/css", StaticFiles::from(wikifile::get_path("css")))  // TODO, secure? use the site value from config
-    .mount("/js", StaticFiles::from(wikifile::get_path("js")))  // use the site value from config
-    .mount("/media", StaticFiles::from(wikifile::get_path("media")))  // use the site value from config
+    .mount("/css", StaticFiles::from(wikifile::get_path("css")))  // TODO, secure? 
+    .mount("/js", StaticFiles::from(wikifile::get_path("js")))
+    .mount("/media", StaticFiles::from(wikifile::get_path("media")))
     .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
         login_user, login_page, logout, login,
         logs::rocket_route_js_debug, logs::rocket_route_js_exception, logs::rocket_route_js_error, logs::rocket_route_js_log,

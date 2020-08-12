@@ -29,6 +29,7 @@ pub struct PageRevisionStruct {
 }
 
 impl PageRevisionStruct {
+    // clean the page field to make sure it is valid
     fn clean(&mut self, case_sense: bool) {
         let res = match case_sense {
             true => Cow::from(&self.page),
@@ -40,8 +41,6 @@ impl PageRevisionStruct {
     }
 }
 
-// TODO - centralize wiki local file path handling??
-// TODO - where do I get load
 /// Tries to load a tinywiki file, splitting it into two string, the content and the version info
 pub fn load_parts<P: AsRef<Path>>(path: P) -> Result<(String, PageRevisionStruct), Box<dyn error::Error>> {
     let fs = fs::read_to_string(path)?;
@@ -53,18 +52,17 @@ pub fn load_parts<P: AsRef<Path>>(path: P) -> Result<(String, PageRevisionStruct
 
 /// Takes a revision structure and data and writes them to the wiki
 pub fn write_parts(vers: &PageRevisionStruct, data: &str) -> Result<(), Box<dyn error::Error>> {
-//    let pbase = Path::new("site/wiki/").join(&vers.page);
+    // generate location for file
     let pbase = wikifile::get_path("wiki").join(&vers.page);
 
+    // generate the data to write
     let vinfo = serde_json::to_string_pretty(vers)?;
     let all = join_version(&vinfo, data);
 
-//    let pver = pbase.join(&vers.revision);
+    // write to current and to the revision number
     fs::write(pbase.join(&vers.revision), &all)?;
-//    let cver = pbase.join("current");
     fs::write(pbase.join("current"), &all)?;
     Ok(())
-    // write to /wiki/input.page/current
  }
 
 /// Takes a file in wiki format and divides it into the version information and data

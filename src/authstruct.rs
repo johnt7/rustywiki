@@ -52,7 +52,6 @@ pub fn load_auth() -> Result<wikifile::WikiStruct<AuthStruct>, Box<dyn error::Er
 pub fn load_auth_int() -> Result<wikifile::WikiContainer<AuthStruct>, Box<dyn error::Error>> {
     // TODO, look at cleaning this code up a bit
     if let Ok((um, hdr)) = wikifile::load_parts(wikifile::get_path("wiki/_user/current")) {
-//        if let Ok((um, hdr)) = wikifile::load_parts("site/wiki/_user/current") {
             let umwin: Wrapper = serde_json::from_str(&um)?;
         let umap = AuthStruct(
             umwin.user_list.iter().map(   |us| (us.user.clone(), us.clone())    ).collect()
