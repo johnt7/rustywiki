@@ -3,7 +3,7 @@ use std::{
     error,
     fs,
     ops::Deref,
-    path::Path,
+    path::{Path, PathBuf},
     sync::RwLock
 };
 
@@ -102,5 +102,18 @@ impl<S> Deref for WikiStruct<S> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+static mut FILE_ROOT: Option<String> = None;
+
+pub fn set_path(root_path: String) {
+    unsafe {
+        FILE_ROOT = Some(root_path);
+    }
+}
+pub fn get_path(path_ext: &str) -> PathBuf {
+    unsafe {
+        PathBuf::from(FILE_ROOT.as_ref().unwrap()).join(path_ext)
     }
 }

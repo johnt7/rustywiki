@@ -6,7 +6,7 @@
 #[macro_use] extern crate serde_derive;
 
 // TODO - refactor main
-//      - test user auth
+//      - finish applying PageUser and then test user auth
 //      - user api calls
 //      - centralized file handling
 //      - cleanups
@@ -151,7 +151,7 @@ fn rocket_route_user_modify(input: Json<UserModify>) -> String {
 
 // TODO - clean up messages
 #[post("/jsUser/Wikisave", data = "<input>")]
-fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
+fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
     error!("wiki save {} {} {} {} {} {} {} {} {}", input.page, input.revision, input.previous_revision, input.create_date, input.revision_date, input.revised_by, input.comment, input.lock, input.data);
     if input.revision == "" || input.previous_revision == "" {
         return Status::new(519, "no revision or previous revision");
@@ -176,7 +176,7 @@ fn rocket_route_wiki_save(lock_data : State<PageMap>, input: Json<wikifile::Page
 }
 
 #[post("/jsUser/Wikilock", data = "<input>")]
-fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
+fn rocket_route_user_lock(_user: User, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
     if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock page");
     }
@@ -191,7 +191,7 @@ fn rocket_route_user_lock(lock_data : State<PageMap>, input: Json<Wikilock>) -> 
 }
 
 #[post("/jsUser/Wikiunlock", data = "<input>")]
-fn rocket_route_user_unlock(lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
+fn rocket_route_user_unlock(_user: User, lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
      if input.page == "" {
         return None;
     }
@@ -228,7 +228,7 @@ fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String 
 // TODO - cleanup output
 /// do master reset of the system
 #[get("/jsAdmin/MasterReset")]
-fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) -> String {
+fn rocket_route_master_reset(_user: User, delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) -> String {
     *delay_map.write().unwrap() = HashMap::new();
     *page_locks.write().unwrap() = HashMap::new();
     *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
@@ -241,7 +241,7 @@ fn rocket_route_master_reset(delay_map: State<DelayMap>, page_locks: State<PageM
 
 /// Gets the wiki page requested
 #[get("/wiki/<page_name>/<version>")]
-fn rocket_route_wiki(_user: PageUser, page_name : String, version: Option<String>) -> io::Result<String> {
+fn rocket_route_wiki(_user: User, page_name : String, version: Option<String>) -> io::Result<String> {
     let version = version.unwrap_or("current".to_string());
     let path_name = format!("site/wiki/{}/{}", page_name, version);
    fs::read_to_string(path_name)
@@ -334,7 +334,12 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     .port(cmd_cfg.port)
     .finalize().unwrap();
 
+    wikifile::set_path(cmd_cfg.site);
+    let path = wikifile::get_path("foo");
+    println!("path={:?} last={:?}", path, path.file_name());
+
     let auth =  authstruct::load_auth().unwrap();
+    println!("suth={:?}", auth.read());
     let cfg = config::load_config().unwrap();
     let mi = media::MediaIndex::new();
 
