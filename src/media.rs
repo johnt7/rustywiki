@@ -39,20 +39,11 @@ pub fn media_str() -> String {
     dir_list(wikifile::get_path("media")).unwrap_or("failed".to_string() )
 }
 
+// Holds the media index
 wrapper!(MediaIndex, RwLock<String>);
 impl MediaIndex {
     pub fn new() -> MediaIndex {
         MediaIndex( RwLock::new( media_str() ))
     }
 }
-/*
-pub struct MediaIndex (RwLock<String>);
 
-impl Deref for MediaIndex {
-    type Target = RwLock<String>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-*/

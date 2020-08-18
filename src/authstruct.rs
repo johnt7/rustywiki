@@ -19,19 +19,9 @@ use super::{
 
 
 
+// Wrapper for auth data
 wrapper!(AuthStruct, HashMap<String, UserStruct>);
-/*
-#[derive(Serialize, Deserialize, Debug)]
-/// Wrapper for auth data
-pub struct AuthStruct (HashMap<String, UserStruct>);
-impl Deref for AuthStruct {
-    type Target = HashMap<String, UserStruct>;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-*/
 /// Use to load and write to file
 #[derive(Serialize, Deserialize, Debug)]
 struct Wrapper {
