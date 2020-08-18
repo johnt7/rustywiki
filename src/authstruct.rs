@@ -16,6 +16,11 @@ use super::{
     wikifile
 };
 
+
+
+
+wrapper!(AuthStruct, HashMap<String, UserStruct>);
+/*
 #[derive(Serialize, Deserialize, Debug)]
 /// Wrapper for auth data
 pub struct AuthStruct (HashMap<String, UserStruct>);
@@ -26,7 +31,7 @@ impl Deref for AuthStruct {
         &self.0
     }
 }
-
+*/
 /// Use to load and write to file
 #[derive(Serialize, Deserialize, Debug)]
 struct Wrapper {

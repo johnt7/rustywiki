@@ -5,15 +5,17 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 
-// TODO - refactor main
+// TODO - macro for wrapper types
 //      - finish applying PageUser and then test user auth
 //      - user api calls
 //      - cleanups
+//      - refactor main
 //      - wikisave should put user into version info
 //      - fixes to index.html
 //          update revision data
 //      - look at other loggers
 //      -https
+//      - add ctrlC handler - https://github.com/Detegr/rust-ctrlc
 
 
 use std::{
@@ -42,6 +44,25 @@ use rocket_contrib::{
 };
 use rocket_prometheus::PrometheusMetrics;
 
+
+// Macro
+#[macro_export]
+macro_rules! wrapper {
+    ( $newType:ident , $oldType:ty ) => {
+        #[derive(Serialize, Deserialize, Debug)]
+        pub struct $newType ( $oldType );
+        impl Deref for $newType {
+            type Target = $oldType;
+        
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+    };
+}
+
+
+
 // Modules
 #[cfg(test)] mod tests;
 mod authstruct;
@@ -62,6 +83,7 @@ use user::{User, PageUser};
 
 // Constants
 const DATE_FORMAT : &str = "%Y/%m/%d %H:%M:%S%.3f";
+
 
 
 
@@ -111,6 +133,11 @@ struct RequestDelayStruct {
 }
 
 /// Structure passed to Rocket to allow storage of delay  information
+impl DelayMap {
+    pub fn new() -> DelayMap {
+        DelayMap ( RwLock::new(HashMap::new()) )
+    }
+}
 struct DelayMap ( RwLock<HashMap<String, RequestDelayStruct>> );
 impl Deref for DelayMap {
     type Target = RwLock<HashMap<String, RequestDelayStruct>>;
@@ -119,11 +146,8 @@ impl Deref for DelayMap {
         &self.0
     }
 }
-impl DelayMap {
-    pub fn new() -> DelayMap {
-        DelayMap ( RwLock::new(HashMap::new()) )
-    }
-}
+
+
 
 /// Structure passed to Rocket to store page locks
 struct PageMap ( RwLock<HashMap<String, String>> );

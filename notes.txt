@@ -1,4 +1,4 @@
-cargo init rustywiki
+cargo init rustywiki  (like new but puts it into existing directory)
 
 rustup override set nightly
 
@@ -10,3 +10,12 @@ http://localhost:8000
 file:///C:/Users/John/OneDrive/projects/rust/rustywiki/target/doc/simplelog/enum.LevelFilter.html
 https://rocket.rs/v0.4/guide/getting-started/
  cargo tree -d
+
+ let user2 = User {
+        email: String::from("another@example.com"),
+        username: String::from("anotherusername567"),
+        ..user1
+    };
+
+
+$env:envvariable=foo
