@@ -71,8 +71,29 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
         });
         match res {
             Some(user) => Outcome::Success(user),
-            None => Outcome::Forward(())
+            None => {
+                error!("forwarding from user");
+                Outcome::Forward(())
+            }
         }
+    }
+}
+
+pub struct PageAdmin(User);
+impl<'a, 'r> FromRequest<'a, 'r> for PageAdmin {
+    type Error = ();
+
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<PageAdmin, Self::Error> {
+        let logged_in = request.guard::<User>(); 
+        match logged_in {
+            Outcome::Success(user) => {
+                if user.auth == AuthState::AuthAdmin {
+                    return Outcome::Success(PageAdmin(user));
+                }
+            },
+            _ => {}
+        };
+        Outcome::Forward(())
     }
 }
 

@@ -5,8 +5,7 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 
-// TODO - macro for wrapper types
-//      - finish applying PageUser and then test user auth
+// TODO - finish applying PageUser and then test user auth
 //      - user api calls
 //      - cleanups
 //      - refactor main
@@ -77,7 +76,7 @@ mod wikifile;
 use authstruct::AuthStruct;
 use wikifile::WikiStruct;
 
-use user::{User, PageUser};
+use user::{User, PageAdmin, PageUser};
 
 
 
@@ -167,7 +166,7 @@ impl PageMap {
 
 // TODO
 #[post("/jsUser/UserModify", data = "<input>")]
-fn rocket_route_user_modify(input: Json<UserModify>) -> String {
+fn rocket_route_user_modify(_user: User, input: Json<UserModify>) -> String {
     debug!("user modify {} {} {} {} {}", input.user, input.password, input.new_password, input.new_password_check, input.comment);
     // make sure user is authenticated
     String::from("Ok")
@@ -198,6 +197,7 @@ fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<w
 
 #[post("/jsUser/Wikilock", data = "<input>")]
 fn rocket_route_user_lock(_user: User, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
+    error!("in wikilock");
     if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock page");
     }
@@ -212,31 +212,32 @@ fn rocket_route_user_lock(_user: User, lock_data : State<PageMap>, input: Json<W
 }
 
 #[post("/jsUser/Wikiunlock", data = "<input>")]
-fn rocket_route_user_unlock(_user: User, lock_data : State<PageMap>, input: Json<Wikilock>) -> Option<String> {
+fn rocket_route_user_unlock(_user: User, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
      if input.page == "" {
-        return None;
+        return Status::new(540, "bad page");
     }
     let mut mp = lock_data.write().unwrap();
     // find if there is a lock on the page and if so make sure the lock tokens match
     if let Some(ll) = mp.get(&input.page) {
         if ll != &input.lock {
-            return None;
+            return Status::new(540, "lock doesn't match");
         }
     } else {
-        return None;
+        return Status::new(540, "lock not found");;
     }
     let res = mp.remove(&input.page);
-
-    let ct = mp.len();
-    info!("user lock {} {} = len={} res={:?}", input.lock, input.page, ct, res);
-    Some(String::from("Ok"))
+    if let Some(_) = res {
+        Status::Ok
+    } else {
+        Status::new(520, "Failed to remove the lock")
+    }
 }
 
 // TODO
 #[post("/jsAdmin/UserDelete", data = "<input>")]
-fn rocket_route_user_delete(input: Json<UserDelete>) -> String {
+fn rocket_route_user_delete(_admin: PageAdmin, input: Json<UserDelete>) -> Option<String> {
     debug!("user delete {}", input.user);
-    String::from("Ok")
+    Some(String::from("Ok"))
 }
 
 // TODO
@@ -244,6 +245,12 @@ fn rocket_route_user_delete(input: Json<UserDelete>) -> String {
 fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String {
     debug!("user upload {}", content_type);
     String::from("Ok")
+}
+
+/// any get request to the site (does not include /) that get here is not authorized
+#[post("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
+fn site_nonauth(_pathnames: PathBuf) -> Status {
+   Status::Unauthorized
 }
 
 /// do master reset of the system
@@ -307,7 +314,7 @@ fn site_top(_user: User, file_name: String) -> Option<File> {
 
 /// any get request to the site (does not include /) that get here is not authorized
 #[get("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
-fn site_nonauth(_pathnames: PathBuf) -> Redirect {
+fn site_post_nonauth(_pathnames: PathBuf) -> Redirect {
    Redirect::to(uri!(site_top: "login.html"))
 }
 
@@ -361,7 +368,7 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
 
     // create the objects needed for running the wiki
     let auth =  authstruct::load_auth().unwrap();
-    println!("suth={:?}", auth.read());
+//    println!("suth={:?}", auth.read());
     let cfg = config::load_config().unwrap();
     let mi = media::MediaIndex::new();
     let delay_map = DelayMap::new();
@@ -383,7 +390,7 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
         login_user, login_page, logout, login,
         logs::rocket_route_js_debug, logs::rocket_route_js_exception, logs::rocket_route_js_error, logs::rocket_route_js_log,
-        rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock,
+        rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock, site_post_nonauth,
         rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
         media::rocket_route_media_index, rocket_route_page, rocket_route_wiki])
 }

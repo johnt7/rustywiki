@@ -114,8 +114,6 @@ pub fn set_path(root_path: String) {
 }
 pub fn get_path(path_ext: &str) -> PathBuf {
     unsafe {
-        println!("get path={}", path_ext);
-        println!("root={:?}", FILE_ROOT);
         PathBuf::from(FILE_ROOT.as_ref().unwrap()).join(path_ext)
     }
 }
