@@ -41,3 +41,4 @@ pub fn load_config_int() -> Result<wikifile::WikiContainer<ConfigurationStruct>,
 		Err("Failed to load".into())
 	}
 }
+

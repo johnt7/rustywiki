@@ -6,8 +6,10 @@
 #[macro_use] extern crate serde_derive;
 
 // TODO - finish applying PageUser and then test user auth
-//      - user api calls
+//      - implement user api calls
+//      - implement delay
 //      - cleanups
+//      - set nocache stuff for non boilerplate
 //      - create types for top level rocket data and then impl shortcuts for uses
 //      - refactor main
 //      - wikisave should put user into version info
@@ -77,7 +79,7 @@ mod wikifile;
 use authstruct::AuthStruct;
 use wikifile::WikiStruct;
 
-use user::{User, PageAdmin, PageUser};
+use user::{User, PageAdmin, PageUser, PageWriter};
 
 
 
@@ -167,7 +169,7 @@ impl PageMap {
 
 // TODO
 #[post("/jsUser/UserModify", data = "<input>")]
-fn rocket_route_user_modify(_user: User, input: Json<UserModify>) -> String {
+fn rocket_route_user_modify(_user: PageWriter, input: Json<UserModify>) -> String {
     debug!("user modify {} {} {} {} {}", input.user, input.password, input.new_password, input.new_password_check, input.comment);
     // make sure user is authenticated
     String::from("Ok")
@@ -175,7 +177,7 @@ fn rocket_route_user_modify(_user: User, input: Json<UserModify>) -> String {
 
 #[post("/jsUser/Wikisave", data = "<input>")]
 /// save a wiki page, updating revision info
-fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
+fn rocket_route_wiki_save(_user: PageWriter, lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
     if input.revision == "" || input.previous_revision == "" {
         return Status::new(519, "no revision or previous revision");
     }
@@ -197,7 +199,7 @@ fn rocket_route_wiki_save(_user: User, lock_data : State<PageMap>, input: Json<w
 }
 
 #[post("/jsUser/Wikilock", data = "<input>")]
-fn rocket_route_user_lock(_user: User, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
+fn rocket_route_user_lock(_user: PageWriter, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
     error!("in wikilock");
     if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock page");
@@ -213,7 +215,7 @@ fn rocket_route_user_lock(_user: User, lock_data : State<PageMap>, input: Json<W
 }
 
 #[post("/jsUser/Wikiunlock", data = "<input>")]
-fn rocket_route_user_unlock(_user: User, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
+fn rocket_route_user_unlock(_user: PageWriter, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
      if input.page == "" {
         return Status::new(540, "bad page");
     }
@@ -235,18 +237,12 @@ fn rocket_route_user_unlock(_user: User, lock_data : State<PageMap>, input: Json
 }
 
 // TODO
-#[post("/jsAdmin/UserDelete", data = "<input>")]
-fn rocket_route_user_delete(_admin: PageAdmin, input: Json<UserDelete>) -> Option<String> {
-    debug!("user delete {}", input.user);
-    Some(String::from("Ok"))
-}
-
-// TODO
 #[post("/jsUser/Upload", data = "<_input>")]
-fn rocket_route_user_upload(content_type: &ContentType, _input: Data) -> String {
+fn rocket_route_user_upload(_user: PageWriter, content_type: &ContentType, _input: Data) -> String {
     debug!("user upload {}", content_type);
     String::from("Ok")
 }
+
 
 /// any get request to the site (does not include /) that get here is not authorized
 #[post("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
@@ -256,7 +252,7 @@ fn site_nonauth(_pathnames: PathBuf) -> Status {
 
 /// do master reset of the system
 #[get("/jsAdmin/MasterReset")]
-fn rocket_route_master_reset(_user: User, delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) -> String {
+fn rocket_route_master_reset(_user: PageAdmin, delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) -> String {
     *delay_map.write().unwrap() = HashMap::new();
     *page_locks.write().unwrap() = HashMap::new();
     *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
@@ -264,6 +260,14 @@ fn rocket_route_master_reset(_user: User, delay_map: State<DelayMap>, page_locks
     *mi.write().unwrap() = media::media_str();
     String::from("Ok")
 }
+
+// TODO
+#[post("/jsAdmin/UserDelete", data = "<input>")]
+fn rocket_route_user_delete(_admin: PageAdmin, input: Json<UserDelete>) -> Option<String> {
+    debug!("user delete {}", input.user);
+    Some(String::from("Ok"))
+}
+
 
 /// Gets the wiki page requested
 #[get("/wiki/<page_name>/<version>")]
