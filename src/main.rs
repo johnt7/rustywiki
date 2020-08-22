@@ -8,6 +8,7 @@
 // TODO - finish applying PageUser and then test user auth
 //      - user api calls
 //      - cleanups
+//      - create types for top level rocket data and then impl shortcuts for uses
 //      - refactor main
 //      - wikisave should put user into version info
 //      - fixes to index.html

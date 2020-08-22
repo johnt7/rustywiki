@@ -36,7 +36,8 @@ pub fn load_config() -> Result<WikiConfig, Box<dyn error::Error>> {
 /// try to load core structure from the core data for a tiny wiki config
 pub fn load_config_int() -> Result<wikifile::WikiContainer<ConfigurationStruct>, Box<dyn error::Error>> {
     if let Ok((cfg, hdr)) = wikifile::load_parts(wikifile::get_path("wiki/_config/current")) {
-		return Ok(wikifile::WikiContainer{data: serde_json::from_str(&cfg)?, header: hdr});
-    }
-    Err("Failed to load".into())
+		Ok(wikifile::WikiContainer{data: serde_json::from_str(&cfg)?, header: hdr})
+    } else {
+		Err("Failed to load".into())
+	}
 }
