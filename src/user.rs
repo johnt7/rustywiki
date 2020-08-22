@@ -46,6 +46,17 @@ pub struct User {
     pub auth: AuthState,
     pub name: String
 }
+impl User {
+    pub fn new_unauth() -> User {
+        User{auth: AuthState::AuthNotAuth, name: "".to_string()}
+    }
+    pub fn new_user(uname: &str, admin: bool) -> User {
+        User {
+            auth:  if admin { AuthState::AuthAdmin } else { AuthState::AuthUser },
+            name: uname.to_string()
+        }
+    }
+}
 impl fmt::Display for User {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.name, self.auth)
@@ -144,7 +155,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for PageUser {
                     // return the logged in user, or non-auth
                     match logged_in {
                         Outcome::Success(u) => u,
-                        _ => User{auth: AuthState::AuthNotAuth, name: "".to_string()}
+                        _ => User::new_unauth()
                     }
                 ));
             }

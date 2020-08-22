@@ -22,26 +22,35 @@ pub struct LogData {
 
 /// Structure used to represent whether the user is allowed to write to logs
 /// Either unauthenticated logging is allowed, or they have to be logged in
-pub struct LogUser;
+pub struct LogUser(user::User);
 impl<'a, 'r> FromRequest<'a, 'r> for LogUser {
     type Error = ();
 
     fn from_request(request: &'a Request<'r>) -> Outcome<LogUser, Self::Error> {
+        /*
         let res = request.cookies().get_private("wiki_auth")
         .and_then(|cookie| {
             user::User::from_str(cookie.value()).ok()
         });
-        match request.guard::<State<config::WikiConfig>>() {
+        */
+        let logged_in = request.guard::<user::User>(); 
+        let need_auth = match request.guard::<State<config::WikiConfig>>() {
             Outcome::Success(cfg) => {
-                if !cfg.0.read().unwrap().data.authentication_required_for_logging {
-                    return Outcome::Success(LogUser);
-                }
+                !cfg.0.read().unwrap().data.authentication_required_for_logging
+                //    false
+                    //return                Outcome::Failure((Status::Unauthorized, ()))
+                //} 
             },
-            _ => {}
+            _ => true
         };
-        match res {
-            Some(_) => Outcome::Success(LogUser),
-            None => Outcome::Failure((Status::Unauthorized, ()))
+        match logged_in {
+            Outcome::Success(u) => 
+                Outcome::Success(LogUser(u)),
+            _ => if need_auth {
+                Outcome::Failure((Status::Unauthorized, ()))
+             } else {
+                Outcome::Failure((Status::Unauthorized, ()))
+            }
         }
     }
 }
