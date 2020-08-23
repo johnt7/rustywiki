@@ -70,7 +70,6 @@ pub fn login_handle(login: Form<super::Login>, cookies: &mut Cookies<'_>, umap: 
         false => AuthState::AuthUser
     };
     let u_tok = User {auth:lvl, name: login.username.to_string()};
-    error!("loging info={:?}", u_tok);
     cookies.add_private(Cookie::new("wiki_auth", u_tok.to_string()));
     Some(u_tok)
 }

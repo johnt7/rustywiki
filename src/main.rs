@@ -5,6 +5,7 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 
+
 // TODO - finish applying PageUser and then test user auth
 //      - implement user api calls
 //      - implement delay
@@ -19,31 +20,21 @@
 //      -https
 //      - add ctrlC handler - https://github.com/Detegr/rust-ctrlc
 
-
 use std::{
-    collections::HashMap,
     fs::{self, File},
     io::{self, Cursor},
-    ops::Deref,
-    path::*,
-    sync::{RwLock},
-    time::{Duration, Instant},
+    path::*
 };
 
 use rocket::{
     config::{Config, Environment},
-    Data,
-    http::{ContentType, Cookie, Cookies, Status, Header},
+    http::{Cookie, Cookies, Status, Header},
     request::Form,
     Response,
     response::Redirect, 
     State
 };
 
-use rocket_contrib::{
-    serve::StaticFiles,
-    json::Json
-};
 use rocket_prometheus::PrometheusMetrics;
 
 
@@ -68,18 +59,22 @@ macro_rules! wrapper {
 // Modules
 #[cfg(test)] mod tests;
 mod authstruct;
-mod cmdline;
 mod basic;
+mod cmdline;
 mod config;
+mod jsadmin;
+mod jsuser;
 mod logs;
 mod media;
+mod pagemap;
 mod user;
 mod wikifile;
 
 use authstruct::AuthStruct;
 use wikifile::WikiStruct;
 
-use user::{User, PageAdmin, PageUser, PageWriter};
+use user::{User, PageUser};
+
 
 
 
@@ -87,27 +82,10 @@ use user::{User, PageAdmin, PageUser, PageWriter};
 const DATE_FORMAT : &str = "%Y/%m/%d %H:%M:%S%.3f";
 
 
+static  DIR_NAMES: [&str; 3] = ["css", "js", "media"];
 
 
-// types
 
-#[derive(Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct UserModify {
-    user: String,
-    password: String,
-    new_password: String,
-    new_password_check: String,
-    comment: String
-}
-
-// also used in unlock
-#[derive(Clone, Deserialize, Debug)]
-#[serde(rename_all = "PascalCase")]
-struct Wikilock {
- page : String,
- lock : String
-}
 
 #[derive(FromForm)]
 pub struct Login {
@@ -123,149 +101,12 @@ struct _Upload {
     image_name : String
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct UserDelete {
- user : String
-}
-
-struct RequestDelayStruct {
-    _delay : Duration,
-    _last : Instant
-}
-
-/// Structure passed to Rocket to allow storage of delay  information
-impl DelayMap {
-    pub fn new() -> DelayMap {
-        DelayMap ( RwLock::new(HashMap::new()) )
-    }
-}
-struct DelayMap ( RwLock<HashMap<String, RequestDelayStruct>> );
-impl Deref for DelayMap {
-    type Target = RwLock<HashMap<String, RequestDelayStruct>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 
-
-/// Structure passed to Rocket to store page locks
-struct PageMap ( RwLock<HashMap<String, String>> );
-impl Deref for PageMap {
-    type Target = RwLock<HashMap<String, String>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl PageMap {
-    pub fn new() -> PageMap {
-        PageMap ( RwLock::new(HashMap::new()) )
-    }
-}
-
-
-// TODO
-#[post("/jsUser/UserModify", data = "<input>")]
-fn rocket_route_user_modify(_user: PageWriter, input: Json<UserModify>) -> String {
-    debug!("user modify {} {} {} {} {}", input.user, input.password, input.new_password, input.new_password_check, input.comment);
-    // make sure user is authenticated
-    String::from("Ok")
-}
-
-#[post("/jsUser/Wikisave", data = "<input>")]
-/// save a wiki page, updating revision info
-fn rocket_route_wiki_save(_user: PageWriter, lock_data : State<PageMap>, input: Json<wikifile::PageRevisionStruct>) -> Status {
-    if input.revision == "" || input.previous_revision == "" {
-        return Status::new(519, "no revision or previous revision");
-    }
-    if input.page == "" || input.lock == "" {
-        return Status::new(519, "no lock or page");
-    }
-    let mp = lock_data.read().unwrap();
-    if let Some(lock_token) = mp.get(&input.page) {
-        if lock_token != &input.lock {
-            return Status::new(520, "wrong lock");
-        }
-    } else {
-        return Status::new(521, "no lock");
-    }
-    match wikifile::write_parts(&input, &input.data) {
-        Ok(_) => Status::Ok,
-        _ => Status::new(522, "failed to write")
-    }
-}
-
-#[post("/jsUser/Wikilock", data = "<input>")]
-fn rocket_route_user_lock(_user: PageWriter, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
-    error!("in wikilock");
-    if input.page == "" || input.lock == "" {
-        return Status::new(519, "no lock page");
-    }
-    let mut mp = lock_data.write().unwrap();
-    if let Some(_) = mp.get(&input.page) {
-        return Status::new(520, "already locked");
-    }
-    let res = mp.insert(input.page.clone(), input.lock.clone());
-    let ct = mp.len();
-    info!("user lock len = {} res={:?}", ct, res);
-    Status::Ok
-}
-
-#[post("/jsUser/Wikiunlock", data = "<input>")]
-fn rocket_route_user_unlock(_user: PageWriter, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
-     if input.page == "" {
-        return Status::new(540, "bad page");
-    }
-    let mut mp = lock_data.write().unwrap();
-    // find if there is a lock on the page and if so make sure the lock tokens match
-    if let Some(ll) = mp.get(&input.page) {
-        if ll != &input.lock {
-            return Status::new(540, "lock doesn't match");
-        }
-    } else {
-        return Status::new(540, "lock not found");;
-    }
-    let res = mp.remove(&input.page);
-    if let Some(_) = res {
-        Status::Ok
-    } else {
-        Status::new(520, "Failed to remove the lock")
-    }
-}
-
-// TODO
-#[post("/jsUser/Upload", data = "<_input>")]
-fn rocket_route_user_upload(_user: PageWriter, content_type: &ContentType, _input: Data) -> String {
-    debug!("user upload {}", content_type);
-    String::from("Ok")
-}
-
-
-/// any get request to the site (does not include /) that get here is not authorized
+/// Any get request to the site that gets here is not authorized.  Does not handl "/"
 #[post("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
 fn site_nonauth(_pathnames: PathBuf) -> Status {
    Status::Unauthorized
-}
-
-/// do master reset of the system
-#[get("/jsAdmin/MasterReset")]
-fn rocket_route_master_reset(_user: PageAdmin, delay_map: State<DelayMap>, page_locks: State<PageMap>, auth: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) -> String {
-    *delay_map.write().unwrap() = HashMap::new();
-    *page_locks.write().unwrap() = HashMap::new();
-    *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
-    *cfg.write().unwrap() =  config::load_config_int().unwrap();
-    *mi.write().unwrap() = media::media_str();
-    String::from("Ok")
-}
-
-// TODO
-#[post("/jsAdmin/UserDelete", data = "<input>")]
-fn rocket_route_user_delete(_admin: PageAdmin, input: Json<UserDelete>) -> Option<String> {
-    debug!("user delete {}", input.user);
-    Some(String::from("Ok"))
 }
 
 
@@ -273,7 +114,6 @@ fn rocket_route_user_delete(_admin: PageAdmin, input: Json<UserDelete>) -> Optio
 #[get("/wiki/<page_name>/<version>")]
 fn rocket_route_wiki(_user: User, page_name : String, version: Option<String>) -> io::Result<String> {
     let version = version.unwrap_or("current".to_string());
-//    let path_name = format!("site/wiki/{}/{}", page_name, version);
     let path_name = wikifile::get_path("wiki").join(page_name).join(version);
    fs::read_to_string(path_name)
 }
@@ -281,7 +121,6 @@ fn rocket_route_wiki(_user: User, page_name : String, version: Option<String>) -
 /// Get the index page, with default set to page_name
 #[get("/page/<page_name>")]
 fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
-//    let path_name = "site/index.html".to_string();
     let path_name = wikifile::get_path("index.html");
     let mut response = Response::new();
     response.set_header(Header::new("Content-Type", "text/html"));
@@ -289,7 +128,6 @@ fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
         Err(err) => {
             let err = format!("{}", err);
             response.set_status(Status::InternalServerError);
-            error!("Could not load {:?}. Error-{}", path_name, err);
             response.set_sized_body(Cursor::new(err));
         },
         Ok(index_str) => {
@@ -317,6 +155,23 @@ fn site_top(_user: User, file_name: String) -> Option<File> {
     File::open(&wikifile::get_path(&file_name)).ok()
 }
 
+/// get a static file
+#[get("/<path_name>/<file_name>", rank=5)]
+fn site_files(_user: User, path_name: String, file_name: String) -> Option<File> {
+    error!("path={}", path_name);
+    if !DIR_NAMES.contains(&&path_name[..]) {
+        error!("not in dirname");
+        return None;
+    }
+    File::open(&wikifile::get_path(&format!("{}/{}", &path_name, &file_name))).ok()
+}
+
+/// get a media file
+#[get("/media/<date_dir>/<file_name>", rank=5)]
+fn media_files(_user: User, date_dir: String, file_name: String) -> Option<File> {
+    File::open(&wikifile::get_path(&format!("media/{}/{}", &date_dir, &file_name))).ok()
+}
+
 /// any get request to the site (does not include /) that get here is not authorized
 #[get("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
 fn site_post_nonauth(_pathnames: PathBuf) -> Redirect {
@@ -338,12 +193,9 @@ fn login_page() -> Option<File> {
 /// Post from the login page, try to set auth cookie
 #[post("/login", data = "<login>")]
 fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>) -> Result<Redirect, ()> {
-
     if let Some(_) = authstruct::login_handle(login, &mut cookies, &umap, &cfg) {
-        error!("handled login");
         Ok(Redirect::to(uri!(site_top: "index.html")))
     } else {
-        error!("failed login");
         Ok(Redirect::to(uri!(site_top: "login.html")))
     }
 }
@@ -373,14 +225,12 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
 
     // create the objects needed for running the wiki
     let auth =  authstruct::load_auth().unwrap();
-//    println!("suth={:?}", auth.read());
     let cfg = config::load_config().unwrap();
     let mi = media::MediaIndex::new();
-    let delay_map = DelayMap::new();
-    let lock_map = PageMap::new(); 
+    let delay_map = jsadmin::DelayMap::new();
+    let lock_map = pagemap::PageMap::new(); 
     let prometheus = PrometheusMetrics::new();
 
-//    rocket::ignite()
     rocket::custom(config)
     .manage(auth)
     .manage(cfg)
@@ -389,14 +239,16 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     .manage(mi)
     .attach(prometheus.clone())
     .mount("/metrics", prometheus)
-    .mount("/css", StaticFiles::from(wikifile::get_path("css")))  // TODO, secure? 
-    .mount("/js", StaticFiles::from(wikifile::get_path("js")))
-    .mount("/media", StaticFiles::from(wikifile::get_path("media")))
     .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
-        login_user, login_page, logout, login,
+        login_user, login_page, logout, login, site_files, media_files, site_post_nonauth,
+
         logs::rocket_route_js_debug, logs::rocket_route_js_exception, logs::rocket_route_js_error, logs::rocket_route_js_log,
-        rocket_route_user_modify, rocket_route_wiki_save, rocket_route_user_lock, site_post_nonauth,
-        rocket_route_user_unlock, rocket_route_user_upload, rocket_route_user_delete, rocket_route_master_reset, 
+
+        jsuser::rocket_route_user_modify, jsuser::rocket_route_wiki_save, jsuser::rocket_route_user_lock,
+        jsuser::rocket_route_user_unlock, jsuser::rocket_route_user_upload,
+
+        jsadmin::rocket_route_user_delete, jsadmin::rocket_route_master_reset, 
+        
         media::rocket_route_media_index, rocket_route_page, rocket_route_wiki])
 }
 
