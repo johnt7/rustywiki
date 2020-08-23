@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use std::{
     collections::HashMap,
     error,
@@ -12,6 +13,7 @@ use rocket::{
 
 use super::{
     config,
+    jsuser,
     user::{User, AuthState},
     wikifile
 };
@@ -29,7 +31,7 @@ struct Wrapper {
     pub user_list: Vec<UserStruct>
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct UserStruct {
 	user : String, 
@@ -56,12 +58,25 @@ pub fn load_auth_int() -> Result<wikifile::WikiContainer<AuthStruct>, Box<dyn er
     Err("Failed to load".into())
 }
 
+pub fn save_auth(auth: &wikifile::WikiStruct<AuthStruct>, user: &str) -> Result<(), Box<dyn error::Error>> {
+    let auth_hash = &auth.read().unwrap().data;
+    let mut auth_vers = auth.read().unwrap().header.clone();
+    let user_hash: Vec<_> = auth_hash.iter().map(|(_,v)| v).collect();
+    let uh_str = serde_json::to_string_pretty(&user_hash).unwrap();
+    auth_vers.previous_revision = auth_vers.revision.to_owned();
+    let new_vers = auth_vers.revision.parse::<usize>().unwrap() + 1;
+    auth_vers.revision = format!("{:09}", new_vers); 
+    auth_vers.revision_date = Utc::now().to_rfc2822(); // TODO format
+    auth_vers.revised_by = user.to_owned();
+    wikifile::write_parts(&auth_vers, &uh_str)?;
+    Ok(())   
+}
 
 // TODO - not happy with the encapsulation, look at refactoring
 pub fn login_handle(login: Form<super::Login>, cookies: &mut Cookies<'_>, umap: &wikifile::WikiStruct<AuthStruct>, cfg: &config::WikiConfig) -> Option<User> {
-    let thing = &umap.read().unwrap().data;
+    let user_hash = &umap.read().unwrap().data;
 
-    let entry = thing.get(&login.username)?;
+    let entry = user_hash.get(&login.username)?;
     if entry.password != login.password { return None };
     let adm_list = &cfg.read().unwrap().data.admin_users;
 
@@ -74,3 +89,16 @@ pub fn login_handle(login: Form<super::Login>, cookies: &mut Cookies<'_>, umap: 
     Some(u_tok)
 }
 
+pub fn delete_user( umap: &wikifile::WikiStruct<AuthStruct>, user_name: &str) -> bool {
+    let user_hash = &mut umap.write().unwrap().data;
+    user_hash.0.remove(user_name).is_some()
+}
+
+pub fn modify_user( umap: &wikifile::WikiStruct<AuthStruct>, user_info: &jsuser::UserModify) -> bool {
+    let user_hash = &mut umap.write().unwrap().data;
+    let entry = user_hash.0.entry(user_info.user.to_owned()).or_default();
+    entry.user = user_info.user.to_owned();
+    entry.password = user_info.new_password.to_owned(); // TODO, change to salt handling
+    entry.comment = user_info.comment.to_owned();
+    true
+}

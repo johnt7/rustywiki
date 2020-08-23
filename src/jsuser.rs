@@ -10,8 +10,9 @@ use rocket_contrib::{
 
 
 use super::{
+    authstruct,
     pagemap::PageMap,
-    user::PageWriter,
+    user::{self, PageWriter},
     wikifile
 };
 
@@ -19,11 +20,11 @@ use super::{
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct UserModify {
-    user: String,
-    password: String,
-    new_password: String,
-    new_password_check: String,
-    comment: String
+    pub user: String,
+    pub password: String,
+    pub new_password: String,
+    pub new_password_check: String,
+    pub comment: String
 }
 
 
@@ -37,10 +38,15 @@ pub struct Wikilock {
 
 // TODO
 #[post("/jsUser/UserModify", data = "<input>")]
-pub fn rocket_route_user_modify(_user: PageWriter, input: Json<UserModify>) -> String {
+pub fn rocket_route_user_modify(user: PageWriter, input: Json<UserModify>, auth: State<super::WikiStruct<authstruct::AuthStruct>>) -> Option<String> {
     debug!("user modify {} {} {} {} {}", input.user, input.password, input.new_password, input.new_password_check, input.comment);
-    // make sure user is authenticated
-    String::from("Ok")
+    if user.0.auth != user::AuthState::AuthAdmin && user.0.name != input.user { return None };
+    if !authstruct::modify_user(&auth, &input) {
+        error!("failed to modify");
+        return None;
+    }
+    // save
+    Some(String::from("Ok"))
 }
 
 #[post("/jsUser/Wikisave", data = "<input>")]

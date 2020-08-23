@@ -1,5 +1,6 @@
 use std::{
     fmt,
+    ops::Deref,
     str::FromStr,
 };
 use rocket::{
@@ -90,7 +91,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 }
 
 /// User has to be logged in as an admin
-pub struct PageAdmin(User);
+pub struct PageAdmin(pub User);
+impl Deref for PageAdmin {
+    type Target = User;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl<'a, 'r> FromRequest<'a, 'r> for PageAdmin {
     type Error = ();
@@ -109,8 +117,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for PageAdmin {
 
 #[derive(Debug)]
 /// Represents permission for a user to read the current page.  They may be logged in or site may be set to allow read without logging in
-pub struct PageUser(User);
+pub struct PageUser(pub User);
+impl Deref for PageUser {
+    type Target = User;
 
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 impl<'a, 'r> FromRequest<'a, 'r> for PageUser {
     type Error = ();
 
@@ -152,8 +166,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for PageUser {
 
 #[derive(Debug)]
 /// Represents permission for a user to read the current page.  They may be logged in or site may be set to allow read without logging in
-pub struct PageWriter(User);
+pub struct PageWriter(pub User);
+impl Deref for PageWriter {
+    type Target = User;
 
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 impl<'a, 'r> FromRequest<'a, 'r> for PageWriter {
     type Error = ();
 
@@ -173,7 +193,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for PageWriter {
 }
 
 /// is the current page an admin page?
-pub struct IsAdminPage(bool);
+pub struct IsAdminPage(pub bool);
 impl<'a, 'r> FromRequest<'a, 'r> for IsAdminPage {
     type Error = ();
 
@@ -193,4 +213,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for IsAdminPage {
             }
         }
     }  
+}
+impl Deref for IsAdminPage {
+    type Target = bool;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }

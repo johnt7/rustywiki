@@ -157,7 +157,7 @@ fn site_top(_user: PageUser, file_name: String) -> Option<File> {
 
 /// get a static file
 #[get("/<path_name>/<file_name>", rank=5)]
-fn site_files(_user: User, path_name: String, file_name: String) -> Option<File> {
+fn site_files(_user: PageUser, path_name: String, file_name: String) -> Option<File> {
     error!("path={}", path_name);
     if !DIR_NAMES.contains(&&path_name[..]) {
         error!("not in dirname");
@@ -168,7 +168,7 @@ fn site_files(_user: User, path_name: String, file_name: String) -> Option<File>
 
 /// get a media file
 #[get("/media/<date_dir>/<file_name>", rank=5)]
-fn media_files(_user: User, date_dir: String, file_name: String) -> Option<File> {
+fn media_files(_user: PageUser, date_dir: String, file_name: String) -> Option<File> {
     File::open(&wikifile::get_path(&format!("media/{}/{}", &date_dir, &file_name))).ok()
 }
 
@@ -180,7 +180,7 @@ fn site_post_nonauth(_pathnames: PathBuf) -> Redirect {
 
 /// already logged in, redirect to /index.html
 #[get("/login.html", rank = 1)]
-fn login_user(_user: User) -> Redirect {
+fn login_user(_user: PageUser) -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
 

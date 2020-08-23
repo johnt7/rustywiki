@@ -1,4 +1,5 @@
 use rocket::{
+    request::Outcome,
     State
 };
 use rocket_contrib::{
@@ -6,6 +7,7 @@ use rocket_contrib::{
 };
 use std::{
     collections::HashMap,
+    error,
     ops::Deref,
     sync::{RwLock},
     time::{Duration, Instant},
@@ -47,18 +49,27 @@ impl Deref for DelayMap {
 
 /// do master reset of the system
 #[get("/jsAdmin/MasterReset")]
-pub fn rocket_route_master_reset(_user: user::PageAdmin, delay_map: State<DelayMap>, page_locks: State<pagemap::PageMap>, auth: State<super::WikiStruct<authstruct::AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) -> String {
-    *delay_map.write().unwrap() = HashMap::new();
-    *page_locks.write().unwrap() = HashMap::new();
-    *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
-    *cfg.write().unwrap() =  config::load_config_int().unwrap();
-    *mi.write().unwrap() = media::media_str();
-    String::from("Ok")
+pub fn rocket_route_master_reset(_user: user::PageAdmin, 
+    delay_map: State<DelayMap>, page_locks: State<pagemap::PageMap>, 
+    auth: State<super::WikiStruct<authstruct::AuthStruct>>, cfg: State<config::WikiConfig>, mi: State<media::MediaIndex>) 
+    -> String {
+        *delay_map.write().unwrap() = HashMap::new();
+        *page_locks.write().unwrap() = HashMap::new();
+        *auth.write().unwrap() =  authstruct::load_auth_int().unwrap();
+        *cfg.write().unwrap() =  config::load_config_int().unwrap();
+        *mi.write().unwrap() = media::media_str();
+        String::from("Ok")
 }
 
 // TODO
 #[post("/jsAdmin/UserDelete", data = "<input>")]
-pub fn rocket_route_user_delete(_admin: user::PageAdmin, input: Json<UserDelete>) -> Option<String> {
-    debug!("user delete {}", input.user);
-    Some(String::from("Ok"))
+pub fn rocket_route_user_delete(admin: user::PageAdmin, input: Json<UserDelete>, auth: State<super::WikiStruct<authstruct::AuthStruct>>) 
+-> Result<String, Box<dyn error::Error>> {
+     error!("user delete {}", input.user);
+    if !authstruct::delete_user(&auth, &input.user) {
+        error!("failed to delete");
+        return Err("Failed to Delete".into());
+    }
+    authstruct::save_auth(&auth, &admin.name)?;
+    Ok(String::from("Ok"))
 }

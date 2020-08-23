@@ -10,7 +10,7 @@ use super::wikifile;
 
 const DELIMETER : &str = "<!--REVISION HEADER DEMARCATION>";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct PageRevisionStruct {
 	pub page : String,
@@ -50,7 +50,7 @@ pub fn load_parts<P: AsRef<Path>>(path: P) -> Result<(String, PageRevisionStruct
     Ok((res.1.to_string(), header))
 }
 
-/// Takes a revision structure and data and writes them to the wiki
+/// Takes a revision structure and data and writes them to a wiki file
 pub fn write_parts(vers: &PageRevisionStruct, data: &str) -> Result<(), Box<dyn error::Error>> {
     // generate location for file
     let pbase = wikifile::get_path("wiki").join(&vers.page);
