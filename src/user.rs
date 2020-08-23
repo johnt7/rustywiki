@@ -126,7 +126,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for PageUser {
                 },
                 _ => { 
                     // not logged in, or not admin
-                    Outcome::Failure((Status::Unauthorized, ()))
+                    Outcome::Forward(())
                 }
             }
         }
@@ -142,7 +142,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for PageUser {
             Outcome::Success(u) => 
                 Outcome::Success(PageUser(u)),
             _ => if need_auth {
-                Outcome::Failure((Status::Unauthorized, ()))
+                Outcome::Forward(())
              } else {
                 Outcome::Success(PageUser(User::new_unauth()))
             }

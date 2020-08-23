@@ -9,15 +9,15 @@
 // TODO - finish applying PageUser and then test user auth
 //      - implement user api calls
 //      - implement delay
+//      - implement https
 //      - cleanups
 //      - set nocache stuff for non boilerplate
 //      - create types for top level rocket data and then impl shortcuts for uses
 //      - refactor main
-//      - wikisave should put user into version info
+//      - wikisave should put the logged in user's id into version info when saving a page
 //      - fixes to index.html
 //          update revision data
 //      - look at other loggers
-//      -https
 //      - add ctrlC handler - https://github.com/Detegr/rust-ctrlc
 
 use std::{
@@ -102,9 +102,9 @@ struct _Upload {
 }
 
 
-
-/// Any get request to the site that gets here is not authorized.  Does not handl "/"
-#[post("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
+/// Any get request to the site that gets here is not authorized.  Does not handle "/"
+/// Rank is set high enough to be after all other file handling
+#[post("/<_pathnames..>", rank = 20)] 
 fn site_nonauth(_pathnames: PathBuf) -> Status {
    Status::Unauthorized
 }
@@ -118,7 +118,7 @@ fn rocket_route_wiki(_user: User, page_name : String, version: Option<String>) -
    fs::read_to_string(path_name)
 }
 
-/// Get the index page, with default set to page_name
+/// Get the index page, with default set to page_name.  Need to replace the dummy with the current page name
 #[get("/page/<page_name>")]
 fn rocket_route_page(_user: User, page_name : String) -> Response<'static> {
     let path_name = wikifile::get_path("index.html");
@@ -147,7 +147,7 @@ fn site_root() -> Redirect {
 
 /// get one of the top level files
 #[get("/<file_name>", rank=5)]
-fn site_top(_user: User, file_name: String) -> Option<File> {
+fn site_top(_user: PageUser, file_name: String) -> Option<File> {
     if file_name!="index.html" &&
         file_name!="favicon.ico" {
         return None
