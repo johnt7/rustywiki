@@ -8,7 +8,6 @@ use rocket_contrib::{
     json::Json
 };
 
-
 use super::{
     authstruct,
     pagemap::PageMap,
@@ -36,17 +35,19 @@ pub struct Wikilock {
  lock : String
 }
 
-// TODO
 #[post("/jsUser/UserModify", data = "<input>")]
-pub fn rocket_route_user_modify(user: PageWriter, input: Json<UserModify>, auth: State<super::WikiStruct<authstruct::AuthStruct>>) -> Option<String> {
+pub fn rocket_route_user_modify(user: PageWriter, input: Json<UserModify>, auth: State<super::WikiStruct<authstruct::AuthStruct>>) 
+-> Status{
     debug!("user modify {} {} {} {} {}", input.user, input.password, input.new_password, input.new_password_check, input.comment);
-    if user.0.auth != user::AuthState::AuthAdmin && user.0.name != input.user { return None };
+    if user.0.auth != user::AuthState::AuthAdmin && user.0.name != input.user { return Status::Unauthorized };
     if !authstruct::modify_user(&auth, &input) {
         error!("failed to modify");
-        return None;
+        return Status::new(519, "failed to modify");
     }
-    // save
-    Some(String::from("Ok"))
+    if let Err(_) = authstruct::save_auth(&auth, &user.name) {
+        return Status::new(519, "failed to save");
+    }
+    Status::Ok
 }
 
 #[post("/jsUser/Wikisave", data = "<input>")]
@@ -74,6 +75,7 @@ pub fn rocket_route_wiki_save(_user: PageWriter, lock_data : State<PageMap>, inp
 }
 
 #[post("/jsUser/Wikilock", data = "<input>")]
+/// Locks wiki entry for editing
 pub fn rocket_route_user_lock(_user: PageWriter, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
     if input.page == "" || input.lock == "" {
         return Status::new(519, "no lock page");
@@ -89,6 +91,7 @@ pub fn rocket_route_user_lock(_user: PageWriter, lock_data : State<PageMap>, inp
 }
 
 #[post("/jsUser/Wikiunlock", data = "<input>")]
+/// Unlocks wiki entry after editing
 pub fn rocket_route_user_unlock(_user: PageWriter, lock_data : State<PageMap>, input: Json<Wikilock>) -> Status {
      if input.page == "" {
         return Status::new(540, "bad page");
@@ -112,6 +115,7 @@ pub fn rocket_route_user_unlock(_user: PageWriter, lock_data : State<PageMap>, i
 
 // TODO
 #[post("/jsUser/Upload", data = "<_input>")]
+/// Upload a media file
 pub fn rocket_route_user_upload(_user: PageWriter, content_type: &ContentType, _input: Data) -> String {
     debug!("user upload {}", content_type);
     String::from("Ok")

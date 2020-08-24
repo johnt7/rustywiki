@@ -6,8 +6,9 @@
 #[macro_use] extern crate serde_derive;
 
 
-// TODO - finish applying PageUser and then test user auth
-//      - implement user api calls
+// TODO - allow using basic authentication
+//      - test user api calls
+//      - implement file uploads
 //      - implement delay
 //      - implement https
 //      - cleanups

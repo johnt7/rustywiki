@@ -1,4 +1,5 @@
-use chrono::{DateTime, Utc};
+use chrono::Utc;
+
 use std::{
     collections::HashMap,
     error,
@@ -66,7 +67,7 @@ pub fn save_auth(auth: &wikifile::WikiStruct<AuthStruct>, user: &str) -> Result<
     auth_vers.previous_revision = auth_vers.revision.to_owned();
     let new_vers = auth_vers.revision.parse::<usize>().unwrap() + 1;
     auth_vers.revision = format!("{:09}", new_vers); 
-    auth_vers.revision_date = Utc::now().to_rfc2822(); // TODO format
+    auth_vers.revision_date = Utc::now().format("%Y/%m/%d %H:%M:%S.%.3f%:z").to_string(); // format "2018/05/12 19:53:05.248-07:00"
     auth_vers.revised_by = user.to_owned();
     wikifile::write_parts(&auth_vers, &uh_str)?;
     Ok(())   

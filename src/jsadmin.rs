@@ -1,5 +1,4 @@
 use rocket::{
-    request::Outcome,
     State
 };
 use rocket_contrib::{
@@ -61,7 +60,6 @@ pub fn rocket_route_master_reset(_user: user::PageAdmin,
         String::from("Ok")
 }
 
-// TODO
 #[post("/jsAdmin/UserDelete", data = "<input>")]
 pub fn rocket_route_user_delete(admin: user::PageAdmin, input: Json<UserDelete>, auth: State<super::WikiStruct<authstruct::AuthStruct>>) 
 -> Result<String, Box<dyn error::Error>> {
