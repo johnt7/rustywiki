@@ -75,24 +75,7 @@ impl FromStr for User {
         Ok(User{auth: AuthState::from_str(auth_st)?, name: name.to_string()})
     }
 }
-/* used for login version
-impl<'a, 'r> FromRequest<'a, 'r> for User {
-    type Error = ();
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<User, Self::Error> {
-        let res = request.cookies().get_private("wiki_auth")
-        .and_then(|cookie| {
-            User::from_str(cookie.value()).ok()
-        });
-        match res {
-            Some(user) => Outcome::Success(user),
-            None => {
-                Outcome::Forward(())
-            }
-        }
-    }
-}
-*/
 impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = ();
 
@@ -108,16 +91,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
                         name: uc.user.clone()
                     })
                 };
-                /*
-                login page handling
-                error!("got cred={:?}, {}", cred.username, cred.password);
-                if cred.username == "root" && cred.password=="adm" {
-                    return Outcome::Success(User {auth: AuthState::AuthNotAuth, name: cred.username});
-                } else if cred.username == "user" && cred.password=="user" {
-                    return Outcome::Success(User {auth: AuthState::AuthUser, name: cred.username});
-                }
-                */
-
             }
             Outcome::Forward(())
         }

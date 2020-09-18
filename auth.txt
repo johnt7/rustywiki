@@ -37,3 +37,15 @@ page and allowed to read
 page and logged in
 wikiwrite and logged in  (/jsuser)
 admin page and adminAuth
+
+/*
+Status
+	unauth
+io::Result<String>
+	
+Response<'static>
+Redirect
+Option<File>
+String
+Result<String, Box<dyn error::Error>> 
+*/

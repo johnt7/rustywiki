@@ -187,36 +187,6 @@ fn site_get_nonauth(user: Option<User>, _pathnames: PathBuf) -> Response<'static
     response.set_sized_body(Cursor::new("Unauthorized!"));
     response
 }
-/*
-These are for using login page
-/// already logged in, redirect to /index.html
-#[get("/login.html", rank = 1)]
-fn login_user(_user: PageUser) -> Redirect {
-    Redirect::to(uri!(site_top: "index.html"))
-}
-/// return login page
-#[get("/login.html", rank = 2)]
-fn login_page() -> Option<File> {
-    File::open(&wikifile::get_path("login.html")).ok()
-}
-
-/// Post from the login page, try to set auth cookie
-#[post("/login", data = "<login>")]
-fn login(mut cookies: Cookies<'_>, login: Form<Login>, umap: State<WikiStruct<AuthStruct>>, cfg: State<config::WikiConfig>) -> Result<Redirect, ()> {
-    if let Some(_) = authstruct::login_handle(login, &mut cookies, &umap, &cfg) {
-        Ok(Redirect::to(uri!(site_top: "index.html")))
-    } else {
-        Ok(Redirect::to(uri!(site_top: "login.html")))
-    }
-}
-
-/// got logout request, forget cookie
-#[post("/logout", rank = 1)]
-fn logout(mut cookies: Cookies<'_>) -> Redirect {
-    cookies.remove_private(Cookie::named("wiki_auth"));
-    Redirect::to(uri!(site_top: "index.html"))
- }
-*/
 
 /// create the Rocket instance.  Having it separate allows easier testing.
 fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
@@ -250,16 +220,11 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     .attach(prometheus.clone())
     .mount("/metrics", prometheus)
     .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top,
-        // login_user, login_page, logout, login, - login version
         site_files, media_files, site_get_nonauth, site_post_nonauth,
-
         logs::rocket_route_js_debug, logs::rocket_route_js_exception, logs::rocket_route_js_error, logs::rocket_route_js_log,
-
         jsuser::rocket_route_user_modify, jsuser::rocket_route_wiki_save, jsuser::rocket_route_user_lock,
         jsuser::rocket_route_user_unlock, jsuser::rocket_route_user_upload,
-
         jsadmin::rocket_route_user_delete, jsadmin::rocket_route_master_reset, 
-        
         media::rocket_route_media_index, rocket_route_page, rocket_route_wiki])
 }
 
@@ -268,15 +233,3 @@ fn main() {
     let config = cmdline::get_command_line();
     create_rocket(config).launch();
 }
-
-/*
-Status
-	unauth
-io::Result<String>
-	
-Response<'static>
-Redirect
-Option<File>
-String
-Result<String, Box<dyn error::Error>> 
-*/
