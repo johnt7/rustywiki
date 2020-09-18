@@ -21,6 +21,11 @@ use super::{
 
 
 
+#[derive(FromForm)]
+pub struct Login {
+    username: String,
+    password: String
+}
 
 // Wrapper for auth data
 wrapper!(AuthStruct, HashMap<String, UserStruct>);
@@ -31,6 +36,7 @@ struct Wrapper {
     #[serde(rename = "Userlist")]
     pub user_list: Vec<UserStruct>
 }
+
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
@@ -74,7 +80,7 @@ pub fn save_auth(auth: &wikifile::WikiStruct<AuthStruct>, user: &str) -> Result<
 }
 
 // TODO - not happy with the encapsulation, look at refactoring
-pub fn login_handle(login: Form<super::Login>, cookies: &mut Cookies<'_>, umap: &wikifile::WikiStruct<AuthStruct>, cfg: &config::WikiConfig) -> Option<User> {
+pub fn login_handle(login: Form<Login>, cookies: &mut Cookies<'_>, umap: &wikifile::WikiStruct<AuthStruct>, cfg: &config::WikiConfig) -> Option<User> {
     let user_hash = &umap.read().unwrap().data;
 
     let entry = user_hash.get(&login.username)?;

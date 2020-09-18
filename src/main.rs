@@ -34,8 +34,7 @@ use rocket::{
     http::{Status, Header},
 //    request::Form,
     Response,
-    response::Redirect, 
-    State
+    response::Redirect
 };
 
 use rocket_prometheus::PrometheusMetrics;
@@ -73,10 +72,8 @@ mod pagemap;
 mod user;
 mod wikifile;
 
-use authstruct::AuthStruct;
-use wikifile::WikiStruct;
-
 use user::{User, PageUser};
+use wikifile::WikiStruct;
 
 
 
@@ -84,17 +81,10 @@ use user::{User, PageUser};
 // Constants
 const DATE_FORMAT : &str = "%Y/%m/%d %H:%M:%S%.3f";
 
-
 static  DIR_NAMES: [&str; 3] = ["css", "js", "media"];
 
 
 
-
-#[derive(FromForm)]
-pub struct Login {
-    username: String,
-    password: String
-}
 
 #[derive(Serialize, Deserialize,FromForm)]
 struct _Upload {
@@ -198,6 +188,7 @@ fn site_get_nonauth(user: Option<User>, _pathnames: PathBuf) -> Response<'static
     response
 }
 /*
+These are for using login page
 /// already logged in, redirect to /index.html
 #[get("/login.html", rank = 1)]
 fn login_user(_user: PageUser) -> Redirect {

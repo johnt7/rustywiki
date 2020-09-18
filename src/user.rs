@@ -109,6 +109,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
                     })
                 };
                 /*
+                login page handling
                 error!("got cred={:?}, {}", cred.username, cred.password);
                 if cred.username == "root" && cred.password=="adm" {
                     return Outcome::Success(User {auth: AuthState::AuthNotAuth, name: cred.username});

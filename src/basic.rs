@@ -53,6 +53,7 @@ use rocket::{
     request::FromRequest
 };
 
+#[derive(Debug)]
 pub struct BasicAuthRaw {
     pub username: String,
     pub password: String,
