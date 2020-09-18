@@ -35,10 +35,10 @@ struct Wrapper {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct UserStruct {
-	user : String, 
-	password : String, 
-	salt : String, 
-	comment : String 
+	pub user : String, 
+	pub password : String, 
+	pub salt : String, 
+	pub comment : String 
 }
 
 /// Tries to load the user file for a tiny wiki

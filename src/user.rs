@@ -10,6 +10,8 @@ use rocket::{
     State
 };
 use super::{
+    authstruct,
+    basic,
     config,
     wikifile
 };
@@ -73,6 +75,7 @@ impl FromStr for User {
         Ok(User{auth: AuthState::from_str(auth_st)?, name: name.to_string()})
     }
 }
+/* used for login version
 impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = ();
 
@@ -88,6 +91,35 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
             }
         }
     }
+}
+*/
+impl<'a, 'r> FromRequest<'a, 'r> for User {
+    type Error = ();
+
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<User, ()> {
+            let b = basic::BasicAuthRaw::from_request(request)?;
+            let auth =  request.guard::<State<wikifile::WikiStruct<authstruct::AuthStruct>>>()?;
+            let auth_hash = &auth.read().unwrap().data;
+            let hentry = auth_hash.get(&b.username);
+            if let Some(uc) = hentry {
+                if b.password == uc.password {
+                    return Outcome::Success(User {
+                        auth: AuthState::AuthUser,
+                        name: uc.user.clone()
+                    })
+                };
+                /*
+                error!("got cred={:?}, {}", cred.username, cred.password);
+                if cred.username == "root" && cred.password=="adm" {
+                    return Outcome::Success(User {auth: AuthState::AuthNotAuth, name: cred.username});
+                } else if cred.username == "user" && cred.password=="user" {
+                    return Outcome::Success(User {auth: AuthState::AuthUser, name: cred.username});
+                }
+                */
+
+            }
+            Outcome::Forward(())
+        }
 }
 
 /// User has to be logged in as an admin

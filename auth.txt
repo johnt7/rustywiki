@@ -20,3 +20,20 @@ mediaIndex - string that is stored and refreshed
 
 /page/ - loads index.html with page in dummy
 /wiki/page/version - returns the page as is
+
+
+User
+LogUser(User)
+
+PageAdmin(User)
+PageUser(User)
+PageWriter(User) 
+
+is one of the real pages
+logging and allowed to log (/jslog)
+logging and logged in (/jslog)
+
+page and allowed to read
+page and logged in
+wikiwrite and logged in  (/jsuser)
+admin page and adminAuth

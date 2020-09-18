@@ -7,6 +7,8 @@
 
 
 // TODO - allow using basic authentication
+//      - add readme, including how to run it, need nightly
+//      - russel had to run as cargo run -- -s ../../site
 //      - test user api calls
 //      - implement file uploads
 //      - implement delay
@@ -29,8 +31,8 @@ use std::{
 
 use rocket::{
     config::{Config, Environment},
-    http::{Cookie, Cookies, Status, Header},
-    request::Form,
+    http::{Status, Header},
+//    request::Form,
     Response,
     response::Redirect, 
     State
@@ -106,7 +108,7 @@ struct _Upload {
 /// Any get request to the site that gets here is not authorized.  Does not handle "/"
 /// Rank is set high enough to be after all other file handling
 #[post("/<_pathnames..>", rank = 20)] 
-fn site_nonauth(_pathnames: PathBuf) -> Status {
+fn site_post_nonauth(_pathnames: PathBuf) -> Status {
    Status::Unauthorized
 }
 
@@ -174,17 +176,33 @@ fn media_files(_user: PageUser, date_dir: String, file_name: String) -> Option<F
 }
 
 /// any get request to the site (does not include /) that get here is not authorized
-#[get("/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
-fn site_post_nonauth(_pathnames: PathBuf) -> Redirect {
+/// TODO, only needed for login page
+#[get("/x/<_pathnames..>", rank = 20)] // rank high enough to be after the static files which are 10
+fn site_get_nonauth_login(_pathnames: PathBuf) -> Redirect {
    Redirect::to(uri!(site_top: "login.html"))
 }
 
+#[get("/<_pathnames..>", rank = 20)] // high enough to be after the static files which are 10
+fn site_get_nonauth(user: Option<User>, _pathnames: PathBuf) -> Response<'static> {
+    let mut response = Response::new();
+    if user.is_some() {
+        response.set_status(Status::InternalServerError);
+        error!("Non auth, has auth user");
+        return response;
+    }
+    error!("got user 2={:?}", user);
+    let header = Header::new("WWW-Authenticate", "Basic realm=RWIKI");
+    response.set_status(Status::Unauthorized);
+    response.set_header(header);
+    response.set_sized_body(Cursor::new("Unauthorized!"));
+    response
+}
+/*
 /// already logged in, redirect to /index.html
 #[get("/login.html", rank = 1)]
 fn login_user(_user: PageUser) -> Redirect {
     Redirect::to(uri!(site_top: "index.html"))
 }
-
 /// return login page
 #[get("/login.html", rank = 2)]
 fn login_page() -> Option<File> {
@@ -207,7 +225,7 @@ fn logout(mut cookies: Cookies<'_>) -> Redirect {
     cookies.remove_private(Cookie::named("wiki_auth"));
     Redirect::to(uri!(site_top: "index.html"))
  }
-
+*/
 
 /// create the Rocket instance.  Having it separate allows easier testing.
 fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
@@ -240,8 +258,9 @@ fn create_rocket(cmd_cfg: cmdline::ConfigInfo) -> rocket::Rocket {
     .manage(mi)
     .attach(prometheus.clone())
     .mount("/metrics", prometheus)
-    .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top, site_nonauth,
-        login_user, login_page, logout, login, site_files, media_files, site_post_nonauth,
+    .mount("/", routes![logs::rocket_route_js_debug_no_trunc, site_root, site_top,
+        // login_user, login_page, logout, login, - login version
+        site_files, media_files, site_get_nonauth, site_post_nonauth,
 
         logs::rocket_route_js_debug, logs::rocket_route_js_exception, logs::rocket_route_js_error, logs::rocket_route_js_log,
 
@@ -258,3 +277,15 @@ fn main() {
     let config = cmdline::get_command_line();
     create_rocket(config).launch();
 }
+
+/*
+Status
+	unauth
+io::Result<String>
+	
+Response<'static>
+Redirect
+Option<File>
+String
+Result<String, Box<dyn error::Error>> 
+*/

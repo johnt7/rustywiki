@@ -37,7 +37,8 @@ pub struct Wikilock {
 
 #[post("/jsUser/UserModify", data = "<input>")]
 pub fn rocket_route_user_modify(user: PageWriter, input: Json<UserModify>, auth: State<super::WikiStruct<authstruct::AuthStruct>>) 
--> Status{
+-> Status
+{
     debug!("user modify {} {} {} {} {}", input.user, input.password, input.new_password, input.new_password_check, input.comment);
     if user.0.auth != user::AuthState::AuthAdmin && user.0.name != input.user { return Status::Unauthorized };
     if !authstruct::modify_user(&auth, &input) {
